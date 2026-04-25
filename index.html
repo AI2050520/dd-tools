@@ -166,6 +166,8 @@
     }
     @media (max-width: 400px) { .summary-cards { grid-template-columns: 1fr; } }
   </style>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -497,15 +499,40 @@ function calcHours(start,end){const[sh,sm]=start.split(':').map(Number);const[eh
 function fmtHours(h){if(h===0)return '—';return `${h}h`;}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
+// ── Firebase ──────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey:"AIzaSyCf1D8uYmBXgGFPrhvTQ9l_NwP-lDthQC4",
+  authDomain:"dd-tools-d94eb.firebaseapp.com",
+  projectId:"dd-tools-d94eb",
+  storageBucket:"dd-tools-d94eb.firebasestorage.app",
+  messagingSenderId:"803411935254",
+  appId:"1:803411935254:web:9376e7e551efa2dd977537"
+});
+const _fs=firebase.firestore();
+const _docRef=_fs.collection('app').doc('data');
+const _cache={shifts:null,employees:null,pwHash:null};
+
 const DB={
-  getShifts(){return JSON.parse(localStorage.getItem(STORAGE_KEY_SHIFTS)||'[]');},
-  saveShifts(s){localStorage.setItem(STORAGE_KEY_SHIFTS,JSON.stringify(s));},
-  getEmployees(){return JSON.parse(localStorage.getItem(STORAGE_KEY_EMPS)||'[]');},
-  saveEmployees(e){localStorage.setItem(STORAGE_KEY_EMPS,JSON.stringify(e));},
-  getPwHash(){return localStorage.getItem(STORAGE_KEY_PW);},
-  setPwHash(h){localStorage.setItem(STORAGE_KEY_PW,h);},
-  getTemplates(){return JSON.parse(localStorage.getItem(STORAGE_KEY_TPLS)||'[]');},
-  saveTemplates(t){localStorage.setItem(STORAGE_KEY_TPLS,JSON.stringify(t));}
+  getShifts(){return _cache.shifts||[];},
+  saveShifts(s){_cache.shifts=s;_docRef.set({shifts:s},{merge:true}).catch(console.error);},
+  getEmployees(){return _cache.employees||[];},
+  saveEmployees(e){_cache.employees=e;_docRef.set({employees:e},{merge:true}).catch(console.error);},
+  getPwHash(){return _cache.pwHash;},
+  setPwHash(h){_cache.pwHash=h;_docRef.set({pwHash:h},{merge:true}).catch(console.error);},
+  getTemplates(){return[];},
+  saveTemplates(){},
+  async loadFromCloud(){
+    try{
+      const snap=await _docRef.get();
+      if(snap.exists){const d=snap.data();_cache.shifts=d.shifts||[];_cache.employees=d.employees||[];_cache.pwHash=d.pwHash||null;}
+      else{_cache.shifts=[];_cache.employees=[];_cache.pwHash=null;}
+    }catch(e){
+      console.error('Firebase load error:',e);
+      _cache.shifts=JSON.parse(localStorage.getItem(STORAGE_KEY_SHIFTS)||'[]');
+      _cache.employees=JSON.parse(localStorage.getItem(STORAGE_KEY_EMPS)||'[]');
+      _cache.pwHash=localStorage.getItem(STORAGE_KEY_PW);
+    }
+  }
 };
 
 function getEmpColor(name){const emps=DB.getEmployees();const idx=emps.indexOf(name);return EMPLOYEE_COLORS[(idx<0?0:idx)%EMPLOYEE_COLORS.length];}
@@ -854,9 +881,13 @@ function seedSampleData(){
 }
 
 (async function startup(){
+  const loginBtn=document.getElementById('loginBtn');
+  if(loginBtn){loginBtn.disabled=true;loginBtn.textContent='Loading...';}
+  await DB.loadFromCloud();
   if(!DB.getPwHash())DB.setPwHash(await sha256(DEFAULT_PASSWORD));
   seedSampleData();
   applyI18n();
+  if(loginBtn){loginBtn.disabled=false;loginBtn.textContent=t('loginBtn');}
   if(sessionStorage.getItem('sched_session')==='ok'){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('appContainer').classList.remove('hidden');
