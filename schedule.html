@@ -197,6 +197,7 @@
       </button>
       <button class="btn btn-primary btn-sm" onclick="openQuickSchedule()" data-i18n="quickScheduleBtn">⚡ 快速排班</button>
       <button class="btn btn-secondary btn-sm" onclick="captureSchedule()" id="screenshotBtn" style="padding:5px 10px">📷</button>
+      <button class="btn btn-secondary btn-sm" id="timeFmtBtn" onclick="toggleTimeFmt()" style="padding:5px 10px;font-size:.78rem;font-weight:700">AM/PM</button>
     </div>
     <div class="schedule-grid-wrapper">
       <div class="schedule-grid" id="scheduleGrid"></div>
@@ -417,6 +418,7 @@ const TRANSLATIONS={
   }
 };
 let currentLang=localStorage.getItem('sched_lang')||'zh';
+let timeFmt=localStorage.getItem('sched_time_fmt')||'24h';
 function t(k){return TRANSLATIONS[currentLang][k]??k;}
 function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{const v=t(el.dataset.i18n);if(typeof v==='string')el.innerHTML=v;});
@@ -440,6 +442,19 @@ function getWeekStart(date){const d=new Date(date);const day=d.getDay();const di
 function fmtMMDD(date){return `${padZ(date.getMonth()+1)}/${padZ(date.getDate())}`;}
 function calcHours(start,end){const[sh,sm]=start.split(':').map(Number);const[eh,em]=end.split(':').map(Number);let mins=(eh*60+em)-(sh*60+sm);if(mins<0)mins+=24*60;return Math.round(mins/60*10)/10;}
 function fmtHours(h){if(h===0)return '—';return `${h}h`;}
+function fmtTime(t24){
+  if(timeFmt==='24h'||!t24)return t24;
+  const[h,m]=t24.split(':').map(Number);
+  const ampm=h<12?'AM':'PM';
+  const h12=h%12||12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+function toggleTimeFmt(){
+  timeFmt=timeFmt==='24h'?'12h':'24h';
+  localStorage.setItem('sched_time_fmt',timeFmt);
+  document.getElementById('timeFmtBtn').textContent=timeFmt==='24h'?'AM/PM':'24H';
+  renderSchedule();
+}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 firebase.initializeApp({
@@ -505,7 +520,7 @@ function renderSchedule(){
       const color=getEmpColor(s.employeeName);const h=calcHours(s.startTime,s.endTime);
       const card=document.createElement('div');card.className='shift-card';
       card.style.cssText=`border-left-color:${color};background:${color}18`;
-      card.innerHTML=`<div class="shift-hours-badge" style="background:${color}cc">${fmtHours(h)}</div><div class="shift-emp" style="color:${color}">${escHtml(s.employeeName)}</div><div class="shift-time">${s.startTime} — ${s.endTime}</div>${s.taskLabel?`<div class="shift-task">${escHtml(s.taskLabel)}</div>`:''}<div class="shift-actions"><button class="shift-act-btn edit" onclick="event.stopPropagation();editShift('${s.id}')">✎</button><button class="shift-act-btn del" onclick="event.stopPropagation();deleteShift('${s.id}')">✕</button></div>`;
+      card.innerHTML=`<div class="shift-hours-badge" style="background:${color}cc">${fmtHours(h)}</div><div class="shift-emp" style="color:${color}">${escHtml(s.employeeName)}</div><div class="shift-time">${fmtTime(s.startTime)} — ${fmtTime(s.endTime)}</div>${s.taskLabel?`<div class="shift-task">${escHtml(s.taskLabel)}</div>`:''}<div class="shift-actions"><button class="shift-act-btn edit" onclick="event.stopPropagation();editShift('${s.id}')">✎</button><button class="shift-act-btn del" onclick="event.stopPropagation();deleteShift('${s.id}')">✕</button></div>`;
       card.addEventListener('click',()=>editShift(s.id));shiftsDiv.appendChild(card);
     });}
     col.appendChild(shiftsDiv);
@@ -629,9 +644,48 @@ function showToast(msg,type='default'){const container=document.getElementById('
 
 async function captureSchedule(){
   const btn=document.getElementById('screenshotBtn');btn.textContent='⏳';btn.disabled=true;
-  try{const grid=document.getElementById('scheduleGrid');const label=document.getElementById('weekRangeLabel').innerText;const canvas=await html2canvas(grid,{backgroundColor:'#f1f5f9',scale:2,useCORS:true,scrollX:0,scrollY:0,width:grid.scrollWidth,windowWidth:grid.scrollWidth+40});const link=document.createElement('a');link.download=`排班表_${label.replace(/[\/\\:*?"<>|]/g,'-')}.png`;link.href=canvas.toDataURL('image/png');link.click();}
-  catch(e){showToast('截图失败：'+e.message,'error');}
+  try{
+    const grid=document.getElementById('scheduleGrid');
+    const label=document.getElementById('weekRangeLabel').innerText;
+    const fileName=`排班表_${label.replace(/[\/\\:*?"<>|]/g,'-')}.png`;
+    const canvas=await html2canvas(grid,{backgroundColor:'#f1f5f9',scale:2,useCORS:true,scrollX:0,scrollY:0,width:grid.scrollWidth,windowWidth:grid.scrollWidth+40});
+    const dataUrl=canvas.toDataURL('image/png');
+
+    // Mobile: try native share sheet (user can save directly to Photos)
+    if(typeof navigator.canShare==='function'){
+      const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
+      const file=new File([blob],fileName,{type:'image/png'});
+      if(navigator.canShare({files:[file]})){
+        try{
+          await navigator.share({files:[file],title:'排班表'});
+          btn.textContent='📷';btn.disabled=false;return;
+        }catch(e){
+          if(e.name==='AbortError'){btn.textContent='📷';btn.disabled=false;return;}
+        }
+      }
+    }
+    // Desktop or fallback: show preview modal
+    showImageModal(dataUrl,fileName);
+  }catch(e){showToast('截图失败：'+e.message,'error');}
   btn.textContent='📷';btn.disabled=false;
+}
+function showImageModal(dataUrl,fileName){
+  const ov=document.createElement('div');
+  ov.id='imgPreviewOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:12px';
+  const bar=document.createElement('div');
+  bar.style.cssText='display:flex;gap:10px;align-items:center;flex-shrink:0';
+  bar.innerHTML=`<a href="${dataUrl}" download="${fileName}" class="btn btn-primary btn-sm" onclick="event.stopPropagation()">💾 保存 / 下载</a><button class="btn btn-ghost btn-sm" style="color:#fff;border:1px solid rgba(255,255,255,.3)" onclick="document.getElementById('imgPreviewOverlay').remove();event.stopPropagation()">✕ 关闭</button>`;
+  const hint=document.createElement('p');
+  hint.style.cssText='color:rgba(255,255,255,.55);font-size:.78rem;text-align:center;flex-shrink:0';
+  hint.textContent='手机：长按图片 → 存储到相册 · 电脑：点"保存/下载"或右键图片另存为';
+  const img=document.createElement('img');
+  img.src=dataUrl;
+  img.style.cssText='max-width:100%;max-height:calc(100vh - 140px);border-radius:8px;object-fit:contain;display:block';
+  img.addEventListener('click',e=>e.stopPropagation());
+  ov.appendChild(bar);ov.appendChild(hint);ov.appendChild(img);
+  ov.addEventListener('click',()=>ov.remove());
+  document.body.appendChild(ov);
 }
 
 function seedSampleData(){if(DB.getEmployees().length>0)return;const emps=['张伟','李娜','王芳','赵磊','陈静'];DB.saveEmployees(emps);const shifts=[],ws=getWeekStart(new Date()),tasks=['前台接待','配送','仓库管理','客服','培训','设备维护',''],tmpls=[{s:'08:00',e:'16:00'},{s:'09:00',e:'18:00'},{s:'10:00',e:'19:00'},{s:'12:00',e:'20:00'},{s:'08:30',e:'17:30'}];for(let w=0;w>=-1;w--){for(let d=0;d<7;d++){const date=new Date(ws);date.setDate(date.getDate()+w*7+d);const dStr=toDateStr(date);emps.forEach((emp,ei)=>{if(Math.random()<0.82){const tmpl=tmpls[(ei+d)%tmpls.length];shifts.push({id:uid(),employeeName:emp,date:dStr,startTime:tmpl.s,endTime:tmpl.e,taskLabel:tasks[Math.floor(Math.random()*tasks.length)]});}});}}DB.saveShifts(shifts);}
@@ -641,6 +695,7 @@ function seedSampleData(){if(DB.getEmployees().length>0)return;const emps=['张�
   if(!DB.getPwHash())DB.setPwHash(await sha256(DEFAULT_PASSWORD));
   seedSampleData();
   applyI18n();
+  document.getElementById('timeFmtBtn').textContent=timeFmt==='24h'?'AM/PM':'24H';
   initSchedule();
   initReports();
 })();
