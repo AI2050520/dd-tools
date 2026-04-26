@@ -168,6 +168,7 @@
   </style>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -245,6 +246,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
       <button class="btn btn-primary btn-sm" onclick="openQuickSchedule()" data-i18n="quickScheduleBtn">⚡ 快速排班</button>
+      <button class="btn btn-secondary btn-sm" onclick="captureSchedule()" id="screenshotBtn" title="截图保存" style="padding:5px 10px">📷</button>
     </div>
     <div class="schedule-grid-wrapper">
       <div class="schedule-grid" id="scheduleGrid"></div>
@@ -878,6 +880,29 @@ function seedSampleData(){
     }
   }
   DB.saveShifts(shifts);
+}
+
+async function captureSchedule(){
+  const btn=document.getElementById('screenshotBtn');
+  btn.textContent='⏳';btn.disabled=true;
+  try{
+    const grid=document.getElementById('scheduleGrid');
+    const label=document.getElementById('weekRangeLabel').innerText;
+    const canvas=await html2canvas(grid,{
+      backgroundColor:'#f1f5f9',
+      scale:2,
+      useCORS:true,
+      scrollX:0,scrollY:0,
+      width:grid.scrollWidth,
+      windowWidth:grid.scrollWidth+40
+    });
+    const link=document.createElement('a');
+    const safe=label.replace(/[\/\\:*?"<>|]/g,'-');
+    link.download=`排班表_${safe}.png`;
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+  }catch(e){showToast('截图失败：'+e.message,'error');}
+  btn.textContent='📷';btn.disabled=false;
 }
 
 (async function startup(){
