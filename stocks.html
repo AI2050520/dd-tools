@@ -34,13 +34,18 @@
     .back-btn:hover{border-color:var(--primary);color:var(--primary)}
     .avatar-btn{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));border:none;cursor:pointer;color:#fff;font-weight:700;font-size:.875rem;display:flex;align-items:center;justify-content:center}
     .main-content{max-width:900px;width:100%;margin:0 auto;padding:20px 16px}
-    .stocks-header{background:linear-gradient(135deg,#064e3b,#065f46);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .stocks-header{background:linear-gradient(135deg,#064e3b,#065f46);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
     .stocks-header h2{font-size:1.2rem;font-weight:800;margin-bottom:4px}
     .stocks-header p{font-size:.82rem;opacity:.8}
     .next-brief{background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600;text-align:center;white-space:nowrap}
     .next-brief-label{font-size:.7rem;opacity:.7;margin-bottom:2px}
     .refresh-btn{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
     .refresh-btn:hover{background:rgba(255,255,255,.3)}
+    /* Tabs */
+    .tab-bar{display:flex;gap:4px;margin-bottom:16px;background:var(--card);border-radius:var(--radius);padding:4px;box-shadow:var(--shadow)}
+    .tab-btn{flex:1;padding:9px 12px;border:none;border-radius:var(--radius-sm);font-size:.875rem;font-weight:600;cursor:pointer;transition:all var(--transition);background:transparent;color:var(--text-muted)}
+    .tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 2px 8px rgba(79,70,229,.3)}
+    /* Alert cards */
     .alert-list{display:flex;flex-direction:column;gap:12px}
     .alert-card{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--primary)}
     .alert-card.breaking{border-left-color:var(--danger)}
@@ -56,6 +61,19 @@
     .imp-bar{display:inline-flex;gap:2px}
     .imp-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
     .imp-dot.filled{background:#f59e0b}
+    /* Position cards */
+    .pos-card{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid #8b5cf6}
+    .pos-card.congress{border-left-color:#f59e0b}
+    .pos-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+    .pos-badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:10px}
+    .pos-badge.insider{background:#ede9fe;color:#7c3aed}
+    .pos-badge.congress{background:#fef3c7;color:#d97706}
+    .pos-ticker{display:inline-block;background:var(--primary-light);color:var(--primary);font-weight:700;font-size:.82rem;padding:2px 9px;border-radius:6px}
+    .pos-headline{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4}
+    .pos-detail{font-size:.82rem;color:var(--text-muted);background:var(--bg);border-radius:8px;padding:8px 12px;line-height:1.6}
+    .txt-buy{color:var(--success);font-weight:700}
+    .txt-sell{color:var(--danger);font-weight:700}
+    /* Common */
     .stocks-empty{text-align:center;padding:60px 20px;color:var(--text-light)}
     .stocks-empty .empty-icon{font-size:3rem;margin-bottom:12px}
     .loading{text-align:center;padding:40px;color:var(--text-muted)}
@@ -90,10 +108,19 @@
         <div class="next-brief-label" id="nextBriefLabel">下次早报</div>
         <div id="nextBriefTime">—</div>
       </div>
-      <button class="refresh-btn" onclick="loadAlerts()">🔄 <span id="refreshLabel">刷新</span></button>
+      <button class="refresh-btn" onclick="refreshCurrent()">🔄 <span id="refreshLabel">刷新</span></button>
     </div>
   </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabNews" onclick="switchTab('news')">📰 <span id="tabNewsLabel">市场消息</span></button>
+    <button class="tab-btn" id="tabPos" onclick="switchTab('positions')">📋 <span id="tabPosLabel">持仓动向</span></button>
+  </div>
+
   <div id="alertList" class="alert-list">
+    <div class="loading">加载中…</div>
+  </div>
+  <div id="positionList" class="alert-list hidden">
     <div class="loading">加载中…</div>
   </div>
 </div>
@@ -113,16 +140,31 @@ firebase.initializeApp({
 const _fs=firebase.firestore();
 
 let lang=localStorage.getItem('sched_lang')||'zh';
+let activeTab='news';
 
 const LANG={
-  zh:{brand:'股市追踪',headerTitle:'📈 股市追踪',headerSubtitle:'重要市场消息自动推送 · 周一至周五',
+  zh:{
+    brand:'股市追踪',headerTitle:'📈 股市追踪',headerSubtitle:'重要市场消息自动推送 · 周一至周五',
     nextBriefLabel:'下次早报',refresh:'刷新',back:'工具箱',langBtn:'EN',
+    tabNews:'市场消息',tabPos:'持仓动向',
     breaking:'🚨 突发消息',scheduled:'⏰ 定时早报',
-    empty:'暂无消息记录，后台追踪器将自动推送',loading:'加载中…',logout:'退'},
-  en:{brand:'Market Tracker',headerTitle:'📈 Market Tracker',headerSubtitle:'Auto-push important news · Mon–Fri',
+    insider:'📋 内部人交易',congress:'🏛️ 国会议员',
+    buy:'买入',sell:'卖出',
+    emptyNews:'暂无消息记录，后台追踪器将自动推送',
+    emptyPos:'暂无持仓记录，追踪器将自动检测',
+    loading:'加载中…'
+  },
+  en:{
+    brand:'Market Tracker',headerTitle:'📈 Market Tracker',headerSubtitle:'Auto-push important news · Mon–Fri',
     nextBriefLabel:'Next Brief',refresh:'Refresh',back:'Toolbox',langBtn:'中文',
+    tabNews:'Market News',tabPos:'Position Flow',
     breaking:'🚨 Breaking',scheduled:'⏰ Morning Brief',
-    empty:'No alerts yet — tracker will push automatically',loading:'Loading…',logout:'Quit'}
+    insider:'📋 Insider Trade',congress:'🏛️ Congress',
+    buy:'Buy',sell:'Sell',
+    emptyNews:'No alerts yet — tracker will push automatically',
+    emptyPos:'No position data yet — tracker will detect automatically',
+    loading:'Loading…'
+  }
 };
 
 function applyLang(){
@@ -134,10 +176,32 @@ function applyLang(){
   document.getElementById('refreshLabel').textContent=L.refresh;
   document.getElementById('backLabel').textContent=L.back;
   document.getElementById('langToggle').textContent=L.langBtn;
+  document.getElementById('tabNewsLabel').textContent=L.tabNews;
+  document.getElementById('tabPosLabel').textContent=L.tabPos;
   document.title=L.brand;
   updateNextBriefTime();
 }
-function toggleLang(){lang=lang==='zh'?'en':'zh';localStorage.setItem('sched_lang',lang);applyLang();renderAlerts(lastSnap);}
+function toggleLang(){
+  lang=lang==='zh'?'en':'zh';
+  localStorage.setItem('sched_lang',lang);
+  applyLang();
+  renderAlerts(lastSnap);
+  renderPositions(lastPosSnap);
+}
+
+function switchTab(tab){
+  activeTab=tab;
+  document.getElementById('tabNews').classList.toggle('active',tab==='news');
+  document.getElementById('tabPos').classList.toggle('active',tab==='positions');
+  document.getElementById('alertList').classList.toggle('hidden',tab!=='news');
+  document.getElementById('positionList').classList.toggle('hidden',tab!=='positions');
+  if(tab==='positions'&&lastPosSnap===null)loadPositions();
+}
+
+function refreshCurrent(){
+  if(activeTab==='news')loadAlerts();
+  else loadPositions();
+}
 
 function updateNextBriefTime(){
   const now=new Date();
@@ -149,6 +213,7 @@ function updateNextBriefTime(){
   document.getElementById('nextBriefTime').textContent=next.toLocaleString(lang==='zh'?'zh-CN':'en-US',opts)+' LA';
 }
 
+// ── Market News ────────────────────────────────────────────────────────
 let lastSnap=null;
 async function loadAlerts(){
   document.getElementById('alertList').innerHTML=`<div class="loading">${LANG[lang].loading}</div>`;
@@ -163,7 +228,7 @@ async function loadAlerts(){
 function renderAlerts(snap){
   const L=LANG[lang];
   const listEl=document.getElementById('alertList');
-  if(!snap||snap.empty){listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📡</div><div>${L.empty}</div></div>`;return;}
+  if(!snap||snap.empty){listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📡</div><div>${L.emptyNews}</div></div>`;return;}
   listEl.innerHTML=snap.docs.map(doc=>{
     const d=doc.data();
     const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp||Date.now());
@@ -181,6 +246,58 @@ function renderAlerts(snap){
       </div>
       <div class="alert-headline">${d.headline||''}</div>
       ${d.analysis?`<div class="alert-analysis">${d.analysis}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── Position Flow ──────────────────────────────────────────────────────
+let lastPosSnap=null;
+async function loadPositions(){
+  document.getElementById('positionList').innerHTML=`<div class="loading">${LANG[lang].loading}</div>`;
+  try{
+    const snap=await _fs.collection('position-alerts').orderBy('timestamp','desc').limit(60).get();
+    lastPosSnap=snap;
+    renderPositions(snap);
+  }catch(e){
+    document.getElementById('positionList').innerHTML=`<div class="stocks-empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+function renderPositions(snap){
+  const L=LANG[lang];
+  const listEl=document.getElementById('positionList');
+  if(!snap||snap.empty){listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📡</div><div>${L.emptyPos}</div></div>`;return;}
+  listEl.innerHTML=snap.docs.map(doc=>{
+    const d=doc.data();
+    const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp||Date.now());
+    const timeStr=ts.toLocaleString(lang==='zh'?'zh-CN':'en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'})+' LA';
+    const isCongress=d.type==='congress';
+    const badgeLabel=isCongress?L.congress:L.insider;
+    const isBuy=d.subtype==='buy'||(d.transaction||'').toLowerCase().includes('purchase');
+    const actionCls=isBuy?'txt-buy':'txt-sell';
+    const actionLabel=isBuy?L.buy:L.sell;
+
+    let detail='';
+    if(isCongress){
+      const partyZh=d.party==='Republican'?'共和党':d.party==='Democrat'?'民主党':d.party||'';
+      const partyEn=d.party||'';
+      const partyStr=lang==='zh'?partyZh:partyEn;
+      detail=`<div class="pos-detail">${d.person||''} ${partyStr?`(${partyStr})`:''} ${d.chamber||''}<br>交易日 ${d.tradeDate||'—'} · 申报日 ${d.reportDate||'—'}</div>`;
+    } else {
+      const fmt=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+Math.round(v/1e3)+'K';
+      const valStr=d.value?fmt(d.value):'';
+      detail=`<div class="pos-detail">${d.person||''} · ${d.role||''}<br>${d.company||''} ${valStr?`· <span class="${actionCls}">${valStr}</span>`:''}</div>`;
+    }
+
+    return `<div class="pos-card ${d.type||''}">
+      <div class="pos-meta">
+        <span class="pos-badge ${d.type||''}">${badgeLabel}</span>
+        ${d.ticker?`<span class="pos-ticker">$${d.ticker}</span>`:''}
+        <span class="${actionCls}">${actionLabel}</span>
+        ${isCongress&&d.range?`<span class="alert-source">${d.range}</span>`:''}
+        <span class="alert-time">${timeStr}</span>
+      </div>
+      <div class="pos-headline">${d.headline||''}</div>
+      ${detail}
     </div>`;
   }).join('');
 }
