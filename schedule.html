@@ -76,7 +76,9 @@
     .shift-card:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.12)}
     .shift-card:hover .shift-actions{opacity:1}
     .shift-emp{font-size:.76rem;font-weight:700;color:var(--text)}
-    .shift-time{font-size:.66rem;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .shift-time{font-size:.66rem;margin-top:2px;display:flex;flex-direction:column;gap:1px}
+    .time-s{color:var(--success);font-weight:600}
+    .time-e{color:#f97316;font-weight:600}
     .shift-task{font-size:.62rem;color:var(--text-muted);background:rgba(255,255,255,.6);border-radius:4px;padding:1px 5px;margin-top:3px;display:inline-block}
     .shift-hours-badge{position:absolute;top:4px;right:5px;font-size:.6rem;font-weight:700;color:#fff;background:rgba(0,0,0,.25);border-radius:10px;padding:1px 5px}
     .shift-actions{position:absolute;bottom:6px;right:6px;display:flex;gap:3px;opacity:0;transition:opacity var(--transition)}
@@ -260,6 +262,7 @@
       <div id="shiftError" class="hidden" style="color:var(--danger);font-size:.82rem;background:#fee2e2;padding:8px 12px;border-radius:8px;"></div>
     </div>
     <div class="modal-footer">
+      <button class="btn btn-danger hidden" id="shiftDeleteBtn" onclick="deleteEditingShift()">🗑️</button>
       <button class="btn btn-secondary" onclick="closeModal('shiftModal')" data-i18n="cancel">取消</button>
       <button class="btn btn-primary" onclick="saveShift()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span data-i18n="save">保存</span></button>
     </div>
@@ -520,7 +523,7 @@ function renderSchedule(){
       const color=getEmpColor(s.employeeName);const h=calcHours(s.startTime,s.endTime);
       const card=document.createElement('div');card.className='shift-card';
       card.style.cssText=`border-left-color:${color};background:${color}18`;
-      card.innerHTML=`<div class="shift-hours-badge" style="background:${color}cc">${fmtHours(h)}</div><div class="shift-emp" style="color:${color}">${escHtml(s.employeeName)}</div><div class="shift-time">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</div>${s.taskLabel?`<div class="shift-task">${escHtml(s.taskLabel)}</div>`:''}<div class="shift-actions"><button class="shift-act-btn edit" onclick="event.stopPropagation();editShift('${s.id}')">✎</button><button class="shift-act-btn del" onclick="event.stopPropagation();deleteShift('${s.id}')">✕</button></div>`;
+      card.innerHTML=`<div class="shift-hours-badge" style="background:${color}cc">${fmtHours(h)}</div><div class="shift-emp" style="color:${color}">${escHtml(s.employeeName)}</div><div class="shift-time"><span class="time-s">▶ ${fmtTime(s.startTime)}</span><span class="time-e">■ ${fmtTime(s.endTime)}</span></div>${s.taskLabel?`<div class="shift-task">${escHtml(s.taskLabel)}</div>`:''}<div class="shift-actions"><button class="shift-act-btn edit" onclick="event.stopPropagation();editShift('${s.id}')">✎</button><button class="shift-act-btn del" onclick="event.stopPropagation();deleteShift('${s.id}')">✕</button></div>`;
       card.addEventListener('click',()=>editShift(s.id));shiftsDiv.appendChild(card);
     });}
     col.appendChild(shiftsDiv);
@@ -530,8 +533,9 @@ function renderSchedule(){
     grid.appendChild(col);
   }
 }
-function openAddShift(dateStr){editingShiftId=null;document.getElementById('shiftModalTitle').textContent=t('addShiftTitle');document.getElementById('shiftDate').value=dateStr||toDateStr(new Date());document.getElementById('shiftStart').value='09:00';document.getElementById('shiftEnd').value='18:00';document.getElementById('shiftTask').value='';document.getElementById('shiftError').classList.add('hidden');populateEmpSelect();openModal('shiftModal');}
-function editShift(id){const shift=DB.getShifts().find(s=>s.id===id);if(!shift)return;editingShiftId=id;document.getElementById('shiftModalTitle').textContent=t('editShiftTitle');populateEmpSelect(shift.employeeName);document.getElementById('shiftDate').value=shift.date;document.getElementById('shiftStart').value=shift.startTime;document.getElementById('shiftEnd').value=shift.endTime;document.getElementById('shiftTask').value=shift.taskLabel||'';document.getElementById('shiftError').classList.add('hidden');openModal('shiftModal');}
+function openAddShift(dateStr){editingShiftId=null;document.getElementById('shiftModalTitle').textContent=t('addShiftTitle');document.getElementById('shiftDate').value=dateStr||toDateStr(new Date());document.getElementById('shiftStart').value='09:00';document.getElementById('shiftEnd').value='18:00';document.getElementById('shiftTask').value='';document.getElementById('shiftError').classList.add('hidden');document.getElementById('shiftDeleteBtn').classList.add('hidden');populateEmpSelect();openModal('shiftModal');}
+function editShift(id){const shift=DB.getShifts().find(s=>s.id===id);if(!shift)return;editingShiftId=id;document.getElementById('shiftModalTitle').textContent=t('editShiftTitle');populateEmpSelect(shift.employeeName);document.getElementById('shiftDate').value=shift.date;document.getElementById('shiftStart').value=shift.startTime;document.getElementById('shiftEnd').value=shift.endTime;document.getElementById('shiftTask').value=shift.taskLabel||'';document.getElementById('shiftError').classList.add('hidden');document.getElementById('shiftDeleteBtn').classList.remove('hidden');openModal('shiftModal');}
+function deleteEditingShift(){if(!editingShiftId)return;const id=editingShiftId;closeModal('shiftModal');openConfirm(t('delShiftTitle'),t('delShiftMsg'),()=>{DB.saveShifts(DB.getShifts().filter(s=>s.id!==id));renderSchedule();renderReports();showToast(t('toastDeleted'),'success');});}
 function populateEmpSelect(selected){const sel=document.getElementById('shiftEmp');sel.innerHTML=DB.getEmployees().map(e=>`<option value="${escHtml(e)}"${e===selected?' selected':''}>${escHtml(e)}</option>`).join('');}
 function saveShift(){
   const emp=document.getElementById('shiftEmp').value.trim(),date=document.getElementById('shiftDate').value,start=document.getElementById('shiftStart').value,end=document.getElementById('shiftEnd').value,task=document.getElementById('shiftTask').value.trim(),errEl=document.getElementById('shiftError');
