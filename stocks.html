@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+  <title>股市追踪</title>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --primary:#4f46e5;--primary-dark:#3730a3;--primary-light:#e0e7ff;
+      --accent:#06b6d4;--danger:#ef4444;--success:#10b981;--warning:#f59e0b;
+      --bg:#f1f5f9;--card:#ffffff;--border:#e2e8f0;--text:#1e293b;
+      --text-muted:#64748b;--text-light:#94a3b8;
+      --shadow:0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+      --shadow-lg:0 10px 40px rgba(0,0,0,.15);
+      --radius:12px;--radius-sm:8px;--transition:.2s ease;
+    }
+    html{font-size:15px}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .hidden{display:none!important}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 18px;border:none;border-radius:var(--radius-sm);font-size:.875rem;font-weight:600;cursor:pointer;transition:all var(--transition)}
+    .btn-ghost{background:transparent;color:var(--text-muted);padding:6px 10px}
+    .btn-ghost:hover{background:var(--border);color:var(--text)}
+    .btn-sm{padding:5px 12px;font-size:.8rem}
+    .navbar{background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;padding:0 16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .navbar-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:12px;height:58px}
+    .nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1rem;color:var(--primary);text-decoration:none}
+    .brand-icon{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center}
+    .brand-icon svg{width:18px;height:18px;color:#fff}
+    .nav-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+    .back-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-size:.82rem;font-weight:600;cursor:pointer;text-decoration:none;transition:all var(--transition)}
+    .back-btn:hover{border-color:var(--primary);color:var(--primary)}
+    .avatar-btn{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));border:none;cursor:pointer;color:#fff;font-weight:700;font-size:.875rem;display:flex;align-items:center;justify-content:center}
+    .main-content{max-width:900px;width:100%;margin:0 auto;padding:20px 16px}
+    .stocks-header{background:linear-gradient(135deg,#064e3b,#065f46);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .stocks-header h2{font-size:1.2rem;font-weight:800;margin-bottom:4px}
+    .stocks-header p{font-size:.82rem;opacity:.8}
+    .next-brief{background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600;text-align:center;white-space:nowrap}
+    .next-brief-label{font-size:.7rem;opacity:.7;margin-bottom:2px}
+    .refresh-btn{background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:.82rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px}
+    .refresh-btn:hover{background:rgba(255,255,255,.3)}
+    .alert-list{display:flex;flex-direction:column;gap:12px}
+    .alert-card{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--primary)}
+    .alert-card.breaking{border-left-color:var(--danger)}
+    .alert-card.scheduled{border-left-color:var(--accent)}
+    .alert-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+    .alert-badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:10px}
+    .alert-badge.breaking{background:#fee2e2;color:var(--danger)}
+    .alert-badge.scheduled{background:#cffafe;color:#0891b2}
+    .alert-time{font-size:.78rem;color:var(--text-muted)}
+    .alert-source{font-size:.78rem;color:var(--text-light);background:var(--bg);border-radius:6px;padding:1px 7px}
+    .alert-headline{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4}
+    .alert-analysis{font-size:.82rem;color:var(--text-muted);line-height:1.6;background:var(--bg);border-radius:8px;padding:10px 12px}
+    .imp-bar{display:inline-flex;gap:2px}
+    .imp-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
+    .imp-dot.filled{background:#f59e0b}
+    .stocks-empty{text-align:center;padding:60px 20px;color:var(--text-light)}
+    .stocks-empty .empty-icon{font-size:3rem;margin-bottom:12px}
+    .loading{text-align:center;padding:40px;color:var(--text-muted)}
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-inner">
+    <div class="nav-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </div>
+      <span id="brandName">股市追踪</span>
+    </div>
+    <div class="nav-actions">
+      <a class="back-btn" href="index.html" id="backBtn">← <span id="backLabel">工具箱</span></a>
+      <button class="btn btn-ghost btn-sm" id="langToggle" onclick="toggleLang()" style="font-weight:700;min-width:42px">EN</button>
+      <button class="avatar-btn" onclick="doLogout()" title="退出">退</button>
+    </div>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="stocks-header">
+    <div>
+      <h2 id="headerTitle">📈 股市追踪</h2>
+      <p id="headerSubtitle">重要市场消息自动推送 · 周一至周五</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+      <div class="next-brief">
+        <div class="next-brief-label" id="nextBriefLabel">下次早报</div>
+        <div id="nextBriefTime">—</div>
+      </div>
+      <button class="refresh-btn" onclick="loadAlerts()">🔄 <span id="refreshLabel">刷新</span></button>
+    </div>
+  </div>
+  <div id="alertList" class="alert-list">
+    <div class="loading">加载中…</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+if(sessionStorage.getItem('portal_auth')!=='ok'){window.location.href='index.html';}
+
+firebase.initializeApp({
+  apiKey:"AIzaSyCf1D8uYmBXgGFPrhvTQ9l_NwP-lDthQC4",
+  authDomain:"dd-tools-d94eb.firebaseapp.com",
+  projectId:"dd-tools-d94eb",
+  storageBucket:"dd-tools-d94eb.firebasestorage.app",
+  messagingSenderId:"803411935254",
+  appId:"1:803411935254:web:9376e7e551efa2dd977537"
+});
+const _fs=firebase.firestore();
+
+let lang=localStorage.getItem('sched_lang')||'zh';
+
+const LANG={
+  zh:{brand:'股市追踪',headerTitle:'📈 股市追踪',headerSubtitle:'重要市场消息自动推送 · 周一至周五',
+    nextBriefLabel:'下次早报',refresh:'刷新',back:'工具箱',langBtn:'EN',
+    breaking:'🚨 突发消息',scheduled:'⏰ 定时早报',
+    empty:'暂无消息记录，后台追踪器将自动推送',loading:'加载中…',logout:'退'},
+  en:{brand:'Market Tracker',headerTitle:'📈 Market Tracker',headerSubtitle:'Auto-push important news · Mon–Fri',
+    nextBriefLabel:'Next Brief',refresh:'Refresh',back:'Toolbox',langBtn:'中文',
+    breaking:'🚨 Breaking',scheduled:'⏰ Morning Brief',
+    empty:'No alerts yet — tracker will push automatically',loading:'Loading…',logout:'Quit'}
+};
+
+function applyLang(){
+  const L=LANG[lang];
+  document.getElementById('brandName').textContent=L.brand;
+  document.getElementById('headerTitle').textContent=L.headerTitle;
+  document.getElementById('headerSubtitle').textContent=L.headerSubtitle;
+  document.getElementById('nextBriefLabel').textContent=L.nextBriefLabel;
+  document.getElementById('refreshLabel').textContent=L.refresh;
+  document.getElementById('backLabel').textContent=L.back;
+  document.getElementById('langToggle').textContent=L.langBtn;
+  document.title=L.brand;
+  updateNextBriefTime();
+}
+function toggleLang(){lang=lang==='zh'?'en':'zh';localStorage.setItem('sched_lang',lang);applyLang();renderAlerts(lastSnap);}
+
+function updateNextBriefTime(){
+  const now=new Date();
+  const la=new Date(now.toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
+  const day=la.getDay(),h=la.getHours(),m=la.getMinutes();
+  let daysUntil=((1-day+7)%7)||((h>6||(h===6&&m>=25))?7:0);
+  const next=new Date(la);next.setDate(la.getDate()+daysUntil);next.setHours(6,25,0,0);
+  const opts={weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'};
+  document.getElementById('nextBriefTime').textContent=next.toLocaleString(lang==='zh'?'zh-CN':'en-US',opts)+' LA';
+}
+
+let lastSnap=null;
+async function loadAlerts(){
+  document.getElementById('alertList').innerHTML=`<div class="loading">${LANG[lang].loading}</div>`;
+  try{
+    const snap=await _fs.collection('stock-alerts').orderBy('timestamp','desc').limit(40).get();
+    lastSnap=snap;
+    renderAlerts(snap);
+  }catch(e){
+    document.getElementById('alertList').innerHTML=`<div class="stocks-empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+function renderAlerts(snap){
+  const L=LANG[lang];
+  const listEl=document.getElementById('alertList');
+  if(!snap||snap.empty){listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📡</div><div>${L.empty}</div></div>`;return;}
+  listEl.innerHTML=snap.docs.map(doc=>{
+    const d=doc.data();
+    const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp||Date.now());
+    const timeStr=ts.toLocaleString(lang==='zh'?'zh-CN':'en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'})+' LA';
+    const isBreaking=d.type==='breaking';
+    const imp=Math.min(5,Math.max(1,parseInt(d.importance)||1));
+    const dots=Array.from({length:5},(_,i)=>`<span class="imp-dot${i<imp?' filled':''}"></span>`).join('');
+    const badge=isBreaking?L.breaking:L.scheduled;
+    return `<div class="alert-card ${d.type||''}">
+      <div class="alert-meta">
+        <span class="alert-badge ${d.type||''}">${badge}</span>
+        <span class="alert-time">${timeStr}</span>
+        ${d.source?`<span class="alert-source">${d.source}</span>`:''}
+        <span class="imp-bar">${dots}</span>
+      </div>
+      <div class="alert-headline">${d.headline||''}</div>
+      ${d.analysis?`<div class="alert-analysis">${d.analysis}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function doLogout(){sessionStorage.removeItem('portal_auth');window.location.href='index.html';}
+
+applyLang();
+loadAlerts();
+</script>
+</body>
+</html>
