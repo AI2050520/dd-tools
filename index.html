@@ -129,6 +129,31 @@
     .summary-card-label { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
     .modal-overlay { position: fixed; inset: 0; z-index: 500; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn .2s ease; }
     #confirmModal { z-index: 600; }
+    .tool-subnav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 16px; }
+    .tool-subnav-inner { max-width: 1400px; margin: 0 auto; display: flex; gap: 4px; height: 42px; align-items: center; }
+    .alert-list { display: flex; flex-direction: column; gap: 12px; }
+    .alert-card { background: var(--card); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); border-left: 4px solid var(--primary); }
+    .alert-card.breaking { border-left-color: var(--danger); }
+    .alert-card.scheduled { border-left-color: var(--accent); }
+    .alert-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .alert-badge { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .alert-badge.breaking { background: #fee2e2; color: var(--danger); }
+    .alert-badge.scheduled { background: #cffafe; color: #0891b2; }
+    .alert-time { font-size: .78rem; color: var(--text-muted); }
+    .alert-source { font-size: .78rem; color: var(--text-light); background: var(--bg); border-radius: 6px; padding: 1px 7px; }
+    .alert-stars { color: #f59e0b; font-size: .85rem; }
+    .alert-headline { font-size: .95rem; font-weight: 700; color: var(--text); margin-bottom: 6px; line-height: 1.4; }
+    .alert-analysis { font-size: .82rem; color: var(--text-muted); line-height: 1.6; background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+    .stocks-header { background: linear-gradient(135deg, #064e3b, #065f46); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 16px; color: #fff; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .stocks-header h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+    .stocks-header p { font-size: .82rem; opacity: .8; }
+    .next-brief { background: rgba(255,255,255,.15); border-radius: 8px; padding: 8px 14px; font-size: .82rem; font-weight: 600; text-align: center; white-space: nowrap; }
+    .next-brief-label { font-size: .7rem; opacity: .7; margin-bottom: 2px; }
+    .stocks-empty { text-align: center; padding: 60px 20px; color: var(--text-light); }
+    .stocks-empty .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+    .imp-bar { display: inline-flex; gap: 2px; }
+    .imp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+    .imp-dot.filled { background: #f59e0b; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .modal-box { background: var(--card); border-radius: 16px; width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); animation: slideUp .25s ease; max-height: 90vh; overflow-y: auto; }
     .modal-box.modal-sm { max-width: 360px; }
@@ -215,13 +240,13 @@
         <span data-i18n="appName">排班管理系统</span>
       </div>
       <div class="nav-tabs">
-        <button class="nav-tab active" data-tab="schedule" onclick="switchTab('schedule')">
+        <button class="nav-tab active" id="toolTabSchedule" onclick="switchTool('schedule')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          <span data-i18n="tabSchedule">排班表</span>
+          <span data-i18n="toolSchedule">排班系统</span>
         </button>
-        <button class="nav-tab" data-tab="reports" onclick="switchTab('reports')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span data-i18n="tabReports">统计报表</span>
+        <button class="nav-tab" id="toolTabStocks" onclick="switchTool('stocks')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          <span data-i18n="toolStocks">股市追踪</span>
         </button>
       </div>
       <div class="nav-actions">
@@ -234,6 +259,19 @@
       </div>
     </div>
   </nav>
+
+  <div class="tool-subnav" id="scheduleSubnav">
+    <div class="tool-subnav-inner">
+      <button class="nav-tab active" id="subTabSchedule" onclick="switchTab('schedule')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span data-i18n="tabSchedule">排班表</span>
+      </button>
+      <button class="nav-tab" id="subTabReports" onclick="switchTab('reports')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span data-i18n="tabReports">统计报表</span>
+      </button>
+    </div>
+  </div>
 
   <div id="scheduleView" class="main-content">
     <div class="week-nav">
@@ -289,6 +327,25 @@
           <thead id="statsTableHead"></thead>
           <tbody id="statsTableBody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="stocksView" class="main-content hidden">
+    <div class="stocks-header">
+      <div>
+        <h2>📈 <span data-i18n="toolStocks">股市追踪</span></h2>
+        <p data-i18n="stocksSubtitle">重要市场消息自动推送 · 周一至周五</p>
+      </div>
+      <div class="next-brief">
+        <div class="next-brief-label" data-i18n="nextBriefLabel">下次早报</div>
+        <div id="nextBriefTime">—</div>
+      </div>
+    </div>
+    <div id="alertList" class="alert-list">
+      <div class="stocks-empty">
+        <div class="empty-icon">📡</div>
+        <div data-i18n="stocksEmpty">暂无消息记录，后台追踪器将自动推送</div>
       </div>
     </div>
   </div>
@@ -389,7 +446,11 @@
 'use strict';
 const TRANSLATIONS={
   zh:{
-    appName:'排班管理系统',tabSchedule:'排班表',tabReports:'统计报表',navSettings:'设置',
+    appName:'我的工具箱',tabSchedule:'排班表',tabReports:'统计报表',navSettings:'设置',
+    toolSchedule:'排班系统',toolStocks:'股市追踪',
+    stocksSubtitle:'重要市场消息自动推送 · 周一至周五',nextBriefLabel:'下次早报',
+    stocksEmpty:'暂无消息记录，后台追踪器将自动推送',
+    alertTypeBreaking:'🚨 突发消息',alertTypeScheduled:'⏰ 定时早报',
     loginSubtitle:'请输入密码以继续',loginPwLabel:'访问密码',loginPwPh:'请输入密码',
     loginErrEmpty:'请输入密码',loginErrWrong:'密码错误，请重试',loginBtn:'登 录',
     prevWeek:'上周',thisWeek:'本周',nextWeek:'下周',quickScheduleBtn:'⚡ 快速排班',
@@ -429,7 +490,11 @@ const TRANSLATIONS={
     noEmpInList:'暂无员工，请添加。',delEmpBtn:'删除',
   },
   en:{
-    appName:'Schedule Manager',tabSchedule:'Schedule',tabReports:'Reports',navSettings:'Settings',
+    appName:'My Toolbox',tabSchedule:'Schedule',tabReports:'Reports',navSettings:'Settings',
+    toolSchedule:'Scheduling',toolStocks:'Market Tracker',
+    stocksSubtitle:'Auto-push important market news · Mon–Fri',nextBriefLabel:'Next Brief',
+    stocksEmpty:'No alerts yet — the tracker will push automatically',
+    alertTypeBreaking:'🚨 Breaking',alertTypeScheduled:'⏰ Morning Brief',
     loginSubtitle:'Enter password to continue',loginPwLabel:'Password',loginPwPh:'Enter password',
     loginErrEmpty:'Please enter a password',loginErrWrong:'Incorrect password, please try again',loginBtn:'Log In',
     prevWeek:'Prev',thisWeek:'This Week',nextWeek:'Next',quickScheduleBtn:'⚡ Quick Schedule',
@@ -840,11 +905,61 @@ function importData(event){
 }
 function clearAllData(){openConfirm(t('clearTitle'),t('clearMsg'),()=>{DB.saveShifts([]);renderSchedule();renderReports();showToast(t('toastCleared'),'success');});}
 
+let currentTool='schedule';
+function switchTool(tool){
+  currentTool=tool;
+  document.getElementById('toolTabSchedule').classList.toggle('active',tool==='schedule');
+  document.getElementById('toolTabStocks').classList.toggle('active',tool==='stocks');
+  document.getElementById('scheduleSubnav').classList.toggle('hidden',tool!=='schedule');
+  document.getElementById('scheduleView').classList.toggle('hidden',tool!=='schedule');
+  document.getElementById('reportsView').classList.toggle('hidden',true);
+  document.getElementById('stocksView').classList.toggle('hidden',tool!=='stocks');
+  if(tool==='stocks'){loadStockAlerts();updateNextBriefTime();}
+}
 function switchTab(tab){
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.getElementById('subTabSchedule').classList.toggle('active',tab==='schedule');
+  document.getElementById('subTabReports').classList.toggle('active',tab==='reports');
   document.getElementById('scheduleView').classList.toggle('hidden',tab!=='schedule');
   document.getElementById('reportsView').classList.toggle('hidden',tab!=='reports');
   if(tab==='reports')renderReports();
+}
+function updateNextBriefTime(){
+  const now=new Date();
+  const la=new Date(now.toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
+  const day=la.getDay();const h=la.getHours();const m=la.getMinutes();
+  let daysUntil=((1-day+7)%7)||((h>6||(h===6&&m>=25))?7:0);
+  const next=new Date(la);next.setDate(la.getDate()+daysUntil);next.setHours(6,25,0,0);
+  const opts={weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'};
+  document.getElementById('nextBriefTime').textContent=next.toLocaleString(currentLang==='zh'?'zh-CN':'en-US',opts)+' LA';
+}
+async function loadStockAlerts(){
+  const listEl=document.getElementById('alertList');
+  try{
+    const snap=await _fs.collection('stock-alerts').orderBy('timestamp','desc').limit(40).get();
+    if(snap.empty){
+      listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📡</div><div>${t('stocksEmpty')}</div></div>`;
+      return;
+    }
+    listEl.innerHTML=snap.docs.map(doc=>{
+      const d=doc.data();
+      const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp);
+      const timeStr=ts.toLocaleString(currentLang==='zh'?'zh-CN':'en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'})+' LA';
+      const isBreaking=d.type==='breaking';
+      const imp=d.importance||1;
+      const dots=Array.from({length:5},(_,i)=>`<span class="imp-dot${i<imp?' filled':''}"></span>`).join('');
+      const badge=isBreaking?t('alertTypeBreaking'):t('alertTypeScheduled');
+      return `<div class="alert-card ${d.type||''}">
+        <div class="alert-meta">
+          <span class="alert-badge ${d.type||''}">${badge}</span>
+          <span class="alert-time">${timeStr}</span>
+          <span class="alert-source">${d.source||''}</span>
+          <span class="imp-bar">${dots}</span>
+        </div>
+        <div class="alert-headline">${d.headline||''}</div>
+        ${d.analysis?`<div class="alert-analysis">${d.analysis}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;}
 }
 function openModal(id){document.getElementById(id).classList.remove('hidden');}
 function closeModal(id){document.getElementById(id).classList.add('hidden');}
