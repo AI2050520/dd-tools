@@ -237,6 +237,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
         <span data-i18n="hoursSection">工时明细</span>
       </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <label class="form-label" style="white-space:nowrap;margin-bottom:0">💰 <span data-i18n="tipsInputLabel">总小费</span></label>
+        <input type="number" class="form-control" id="totalTipsInput" data-i18n-ph="tipsInputPh" placeholder="输入总小费金额" min="0" step="0.01" style="max-width:200px" oninput="renderReports()"/>
+      </div>
       <div class="stats-table-wrapper">
         <table class="stats-table" id="statsTable">
           <thead id="statsTableHead"></thead>
@@ -365,7 +369,7 @@ const TRANSLATIONS={
     filterSection:'筛选条件',startDateLabel:'开始日期',endDateLabel:'结束日期',
     presetToday:'今天',presetWeek:'本周',preset2Weeks:'近两周',presetMonth:'本月',presetCustom:'自定义',
     selectEmpSection:'选择员工',toggleAllBtn:'全选/反选',hoursSection:'工时明细',
-    empCol:'员工',shiftsCol:'班次数',totalHoursCol:'总工时',hoursRatioCol:'工时占比',totalRow:'合计',
+    empCol:'员工',shiftsCol:'班次数',totalHoursCol:'总工时',hoursRatioCol:'工时占比',tipsCol:'小费',tipsInputLabel:'总小费',tipsInputPh:'输入总小费金额',totalRow:'合计',
     noEmpMsg:'请至少选择一名员工',
     summaryShifts:'📅 班次总数',summaryHours:'⏱️ 总工时',summaryEmps:'👥 参与员工',summaryAvg:'📊 人均工时',
     errFillAll:'请填写所有必填项',errSameTime:'上班时间和下班时间不能相同',
@@ -402,7 +406,7 @@ const TRANSLATIONS={
     filterSection:'Filters',startDateLabel:'Start Date',endDateLabel:'End Date',
     presetToday:'Today',presetWeek:'This Week',preset2Weeks:'2 Weeks',presetMonth:'This Month',presetCustom:'Custom',
     selectEmpSection:'Employees',toggleAllBtn:'Select All / Invert',hoursSection:'Hours Detail',
-    empCol:'Employee',shiftsCol:'Shifts',totalHoursCol:'Total Hours',hoursRatioCol:'Share',totalRow:'Total',
+    empCol:'Employee',shiftsCol:'Shifts',totalHoursCol:'Total Hours',hoursRatioCol:'Share',tipsCol:'Tips',tipsInputLabel:'Total Tips',tipsInputPh:'Enter total tips amount',totalRow:'Total',
     noEmpMsg:'Please select at least one employee',
     summaryShifts:'📅 Total Shifts',summaryHours:'⏱️ Total Hours',summaryEmps:'👥 Employees',summaryAvg:'📊 Avg Hours',
     errFillAll:'Please fill in all required fields',errSameTime:'Start and end time cannot be the same',
@@ -583,12 +587,12 @@ function renderReports(){
   const thead=document.getElementById('statsTableHead'),tbody=document.getElementById('statsTableBody');
   let headHtml=`<tr><th>${t('empCol')}</th>`;
   if(showDays){const dn=t('dayNames'),mn=t('monthNames');dates.forEach(ds=>{const d=parseDate(ds);const dateStr=currentLang==='zh'?`${mn[d.getMonth()]}${d.getDate()}日`:`${mn[d.getMonth()]} ${d.getDate()}`;headHtml+=`<th>${dateStr}<br><span style="color:var(--text-light);font-weight:400">${dn[(d.getDay()+6)%7]}</span></th>`;});}
-  headHtml+=`<th>${t('shiftsCol')}</th><th>${t('totalHoursCol')}</th><th style="min-width:160px">${t('hoursRatioCol')}</th></tr>`;
+  headHtml+=`<th>${t('shiftsCol')}</th><th>${t('totalHoursCol')}</th><th style="min-width:160px">${t('hoursRatioCol')}</th><th>${t('tipsCol')}</th></tr>`;
   thead.innerHTML=headHtml;
-  let bodyHtml='',colTotals=dates.map(()=>0),grandTotalShifts=0,grandTotalHours=0;
-  selEmps.forEach((e,ei)=>{const color=getEmpColorByIndex(emps.indexOf(e)),empShifts=inRange.filter(s=>s.employeeName===e),empH=empTotals[e]||0;grandTotalShifts+=empShifts.length;grandTotalHours+=empH;const pct=maxEmpHours>0?(empH/maxEmpHours*100).toFixed(0):0;bodyHtml+=`<tr><td><div class="emp-label"><div class="emp-color-dot" style="background:${color}"></div><span style="font-weight:600">${escHtml(e)}</span></div></td>`;if(showDays)dates.forEach((ds,di)=>{const h=empDayMap[e][ds]||0;colTotals[di]+=h;bodyHtml+=`<td class="hours-cell">${h>0?fmtHours(h):'<span style="color:var(--text-light)">—</span>'}</td>`;});bodyHtml+=`<td>${empShifts.length}</td><td style="color:${color};font-weight:700">${fmtHours(empH)}</td><td><div class="hours-bar-wrap"><div class="hours-bar" style="background:${color}22"><div class="hours-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${color},${color}99)"></div></div><span style="font-size:.75rem;color:var(--text-muted);min-width:30px">${pct}%</span></div></td></tr>`;});
-  if(selEmps.length>0){bodyHtml+=`<tr class="total-row"><td><strong>${t('totalRow')}</strong></td>`;if(showDays)colTotals.forEach(h=>{bodyHtml+=`<td>${h>0?fmtHours(h):'—'}</td>`;});bodyHtml+=`<td>${grandTotalShifts}</td><td>${fmtHours(grandTotalHours)}</td><td>100%</td></tr>`;}
-  if(selEmps.length===0){const cols=showDays?dates.length+4:4;bodyHtml=`<tr><td colspan="${cols}" style="text-align:center;padding:40px;color:var(--text-muted)">${t('noEmpMsg')}</td></tr>`;}
+  const totalTips=parseFloat(document.getElementById('totalTipsInput').value)||0;let bodyHtml='',colTotals=dates.map(()=>0),grandTotalShifts=0,grandTotalHours=0;
+  selEmps.forEach((e,ei)=>{const color=getEmpColorByIndex(emps.indexOf(e)),empShifts=inRange.filter(s=>s.employeeName===e),empH=empTotals[e]||0;grandTotalShifts+=empShifts.length;grandTotalHours+=empH;const barPct=maxEmpHours>0?(empH/maxEmpHours*100).toFixed(0):0;const sharePct=totalHours>0?(empH/totalHours*100):0;const sharePctDisplay=sharePct.toFixed(1);const empTipsAmt=totalTips>0?((sharePct/100)*totalTips).toFixed(2):null;bodyHtml+=`<tr><td><div class="emp-label"><div class="emp-color-dot" style="background:${color}"></div><span style="font-weight:600">${escHtml(e)}</span></div></td>`;if(showDays)dates.forEach((ds,di)=>{const h=empDayMap[e][ds]||0;colTotals[di]+=h;bodyHtml+=`<td class="hours-cell">${h>0?fmtHours(h):'<span style="color:var(--text-light)">—</span>'}</td>`;});bodyHtml+=`<td>${empShifts.length}</td><td style="color:${color};font-weight:700">${fmtHours(empH)}</td><td><div class="hours-bar-wrap"><div class="hours-bar" style="background:${color}22"><div class="hours-bar-fill" style="width:${barPct}%;background:linear-gradient(90deg,${color},${color}99)"></div></div><span style="font-size:.75rem;color:var(--text-muted);min-width:36px">${sharePctDisplay}%</span></div></td><td style="font-weight:600;color:var(--success)">${empTipsAmt!==null?'$'+empTipsAmt:'—'}</td></tr>`;});
+  if(selEmps.length>0){bodyHtml+=`<tr class="total-row"><td><strong>${t('totalRow')}</strong></td>`;if(showDays)colTotals.forEach(h=>{bodyHtml+=`<td>${h>0?fmtHours(h):'—'}</td>`;});bodyHtml+=`<td>${grandTotalShifts}</td><td>${fmtHours(grandTotalHours)}</td><td>100%</td><td style="font-weight:700">${totalTips>0?'$'+totalTips.toFixed(2):'—'}</td></tr>`;}
+  if(selEmps.length===0){const cols=showDays?dates.length+5:5;bodyHtml=`<tr><td colspan="${cols}" style="text-align:center;padding:40px;color:var(--text-muted)">${t('noEmpMsg')}</td></tr>`;}
   tbody.innerHTML=bodyHtml;
 }
 
