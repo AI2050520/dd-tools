@@ -236,6 +236,8 @@
       <div class="report-section-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
         <span data-i18n="hoursSection">工时明细</span>
+        <button class="btn btn-success btn-sm" style="margin-left:auto" onclick="exportStats()" data-i18n="exportExcelBtn">📊 导出 Excel</button>
+        <button class="btn btn-secondary btn-sm" id="statsScreenshotBtn" onclick="captureStats()" style="padding:5px 10px" title="截图">📷</button>
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
         <label class="form-label" style="white-space:nowrap;margin-bottom:0">💰 <span data-i18n="tipsInputLabel">总小费</span></label>
@@ -247,6 +249,13 @@
           <tbody id="statsTableBody"></tbody>
         </table>
       </div>
+    </div>
+    <div class="report-section" id="detailSection" style="display:none">
+      <div class="report-section-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span data-i18n="detailSectionTitle">员工排班明细</span>
+      </div>
+      <div id="detailContent"></div>
     </div>
   </div>
 </div>
@@ -368,7 +377,7 @@ const TRANSLATIONS={
     quickTaskLabel:'工作内容 / 备注（可选）',quickTaskPh:'例如：前台接待、配送…',
     filterSection:'筛选条件',startDateLabel:'开始日期',endDateLabel:'结束日期',
     presetToday:'今天',presetWeek:'本周',preset2Weeks:'近两周',presetMonth:'本月',presetCustom:'自定义',
-    selectEmpSection:'选择员工',toggleAllBtn:'全选/反选',hoursSection:'工时明细',
+    selectEmpSection:'选择员工',toggleAllBtn:'全选/反选',hoursSection:'工时明细',detailSectionTitle:'员工排班明细',exportExcelBtn:'📊 导出 Excel',toastExcelOk:'导出成功',toastNoRange:'请先选择时间范围',
     empCol:'员工',shiftsCol:'班次数',totalHoursCol:'总工时',hoursRatioCol:'工时占比',tipsCol:'小费',tipsInputLabel:'总小费',tipsInputPh:'输入总小费金额',excludeTimeCol:'不计时间(h)',tipsPctCol:'小费占比',totalRow:'合计',
     noEmpMsg:'请至少选择一名员工',
     summaryShifts:'📅 班次总数',summaryHours:'⏱️ 总工时',summaryEmps:'👥 参与员工',summaryAvg:'📊 人均工时',
@@ -405,7 +414,7 @@ const TRANSLATIONS={
     quickTaskLabel:'Task / Notes (optional)',quickTaskPh:'e.g. Front desk, delivery…',
     filterSection:'Filters',startDateLabel:'Start Date',endDateLabel:'End Date',
     presetToday:'Today',presetWeek:'This Week',preset2Weeks:'2 Weeks',presetMonth:'This Month',presetCustom:'Custom',
-    selectEmpSection:'Employees',toggleAllBtn:'Select All / Invert',hoursSection:'Hours Detail',
+    selectEmpSection:'Employees',toggleAllBtn:'Select All / Invert',hoursSection:'Hours Detail',detailSectionTitle:'Shift Details',exportExcelBtn:'📊 Export Excel',toastExcelOk:'Exported successfully',toastNoRange:'Please select a date range first',
     empCol:'Employee',shiftsCol:'Shifts',totalHoursCol:'Total Hours',hoursRatioCol:'Share',tipsCol:'Tips',tipsInputLabel:'Total Tips',tipsInputPh:'Enter total tips amount',excludeTimeCol:'Excl.(h)',tipsPctCol:'Tips %',totalRow:'Total',
     noEmpMsg:'Please select at least one employee',
     summaryShifts:'📅 Total Shifts',summaryHours:'⏱️ Total Hours',summaryEmps:'👥 Employees',summaryAvg:'📊 Avg Hours',
@@ -594,8 +603,190 @@ function renderReports(){
   if(selEmps.length>0){bodyHtml+=`<tr class="total-row"><td><strong>${t('totalRow')}</strong></td>`;if(showDays)colTotals.forEach(h=>{bodyHtml+=`<td>${h>0?fmtHours(h):'—'}</td>`;});bodyHtml+=`<td>${grandTotalShifts}</td><td>${fmtHours(grandTotalHours)}</td><td>—</td><td>—</td><td>100%</td><td style="font-weight:700">${totalTips>0?'$'+totalTips.toFixed(2):'—'}</td></tr>`;}
   if(selEmps.length===0){const cols=showDays?dates.length+7:7;bodyHtml=`<tr><td colspan="${cols}" style="text-align:center;padding:40px;color:var(--text-muted)">${t('noEmpMsg')}</td></tr>`;}
   tbody.innerHTML=bodyHtml;
+  const detailSection=document.getElementById('detailSection'),detailContent=document.getElementById('detailContent');
+  if(selEmps.length===0||inRange.length===0){detailSection.style.display='none';}
+  else{
+    detailSection.style.display='';
+    let dHtml='';
+    selEmps.forEach(e=>{
+      const empShifts=inRange.filter(s=>s.employeeName===e).sort((a,b)=>a.date.localeCompare(b.date));
+      if(!empShifts.length)return;
+      const color=getEmpColorByIndex(emps.indexOf(e));
+      const dn=t('dayNames'),mn=t('monthNames');
+      let empTotalH=0;
+      dHtml+=`<div style="margin-bottom:24px"><div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:2px solid ${color};margin-bottom:10px"><div style="width:12px;height:12px;border-radius:50%;background:${color};flex-shrink:0"></div><span style="font-weight:700;font-size:.95rem;color:${color}">${escHtml(e)}</span><span style="font-size:.75rem;color:var(--text-muted);margin-left:4px">${empShifts.length}${t('shifts')}</span></div><div class="stats-table-wrapper"><table class="stats-table" style="font-size:.82rem"><thead><tr><th style="text-align:left">日期</th><th>上班</th><th>下班</th><th>工时</th><th style="text-align:left">备注</th></tr></thead><tbody>`;
+      empShifts.forEach(s=>{
+        const d=parseDate(s.date);const h=calcHours(s.startTime,s.endTime);empTotalH+=h;
+        const dateStr=currentLang==='zh'?`${mn[d.getMonth()]}${d.getDate()}日`:`${mn[d.getMonth()]} ${d.getDate()}`;
+        const dayStr=dn[(d.getDay()+6)%7];
+        dHtml+=`<tr><td><span style="font-weight:600">${dateStr}</span> <span style="color:var(--text-muted);font-size:.75rem">${dayStr}</span></td><td style="color:var(--success);font-weight:600">${fmtTime(s.startTime)}</td><td style="color:#f97316;font-weight:600">${fmtTime(s.endTime)}</td><td style="color:${color};font-weight:700">${h}h</td><td style="color:var(--text-muted);font-size:.78rem">${escHtml(s.taskLabel||'')}</td></tr>`;
+      });
+      dHtml+=`<tr style="background:var(--primary-light)"><td colspan="3" style="text-align:right;font-weight:700;color:var(--primary)">合计</td><td style="font-weight:800;color:${color}">${empTotalH.toFixed(1)}h</td><td></td></tr></tbody></table></div></div>`;
+    });
+    detailContent.innerHTML=dHtml;
+  }
 }
 
+function exportStats(){
+  const startStr=document.getElementById('reportStart').value,endStr=document.getElementById('reportEnd').value;
+  if(!startStr||!endStr){showToast(t('toastNoRange'),'warning');return;}
+  const shifts=DB.getShifts(),emps=DB.getEmployees(),selEmps=emps.filter(e=>selectedEmployees.has(e));
+  if(!selEmps.length){showToast(t('noEmpMsg'),'warning');return;}
+  const totalTips=parseFloat(document.getElementById('totalTipsInput').value)||0;
+  const inRange=shifts.filter(s=>s.date>=startStr&&s.date<=endStr&&selectedEmployees.has(s.employeeName));
+  const empTotals={};selEmps.forEach(e=>{empTotals[e]=0;});
+  inRange.forEach(s=>{empTotals[s.employeeName]=(empTotals[s.employeeName]||0)+calcHours(s.startTime,s.endTime);});
+  const totalHours=Object.values(empTotals).reduce((a,b)=>a+b,0);
+  const totalAdjustedH=selEmps.reduce((sum,e)=>sum+Math.max(0,(empTotals[e]||0)-(excludedTimes[e]||0)),0);
+  const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const dn=['周一','周二','周三','周四','周五','周六','周日'];
+  let html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>body{font-family:"Microsoft YaHei",Arial,sans-serif}table{border-collapse:collapse;margin-bottom:16px}th,td{border:1px solid #ccc;padding:6px 12px;font-size:11pt}th{background:#e8eaf6;font-weight:bold}.tr{background:#e8eaf6;font-weight:bold}</style></head><body>`;
+  html+=`<p style="font-size:16pt;font-weight:bold;margin-bottom:4px">排班统计报表</p>`;
+  html+=`<p style="color:#555">统计时间段：${startStr} 至 ${endStr}</p>`;
+  html+=`<p style="color:#555">导出时间：${new Date().toLocaleString('zh-CN')}</p>`;
+  if(totalTips>0)html+=`<p style="color:#555">总小费：$${totalTips.toFixed(2)}</p>`;
+  html+=`<br><table><thead><tr><th>员工</th><th>班次数</th><th>总工时</th><th>工时占比</th><th>不计时间(h)</th><th>小费占比</th><th>小费</th></tr></thead><tbody>`;
+  let grandShifts=0;
+  selEmps.forEach(e=>{
+    const empH=empTotals[e]||0,empShiftsN=inRange.filter(s=>s.employeeName===e).length;
+    grandShifts+=empShiftsN;
+    const sharePct=totalHours>0?(empH/totalHours*100):0;
+    const excludedH=excludedTimes[e]||0,adjustedH=Math.max(0,empH-excludedH);
+    const tipsPct=totalAdjustedH>0?(adjustedH/totalAdjustedH*100):0;
+    const empTipsAmt=totalTips>0?'$'+(tipsPct/100*totalTips).toFixed(2):'—';
+    html+=`<tr><td>${escHtml(e)}</td><td align="center">${empShiftsN}</td><td align="center">${empH.toFixed(1)}h</td><td align="center">${sharePct.toFixed(1)}%</td><td align="center">${excludedH>0?excludedH+'h':'—'}</td><td align="center">${tipsPct.toFixed(1)}%</td><td align="center">${empTipsAmt}</td></tr>`;
+  });
+  html+=`<tr class="tr"><td><b>合计</b></td><td align="center">${grandShifts}</td><td align="center">${totalHours.toFixed(1)}h</td><td align="center">100%</td><td align="center">—</td><td align="center">100%</td><td align="center">${totalTips>0?'$'+totalTips.toFixed(2):'—'}</td></tr></tbody></table>`;
+  html+=`<p style="font-size:13pt;font-weight:bold;margin:20px 0 8px">员工排班明细</p>`;
+  selEmps.forEach(e=>{
+    const empShifts=inRange.filter(s=>s.employeeName===e).sort((a,b)=>a.date.localeCompare(b.date));
+    if(!empShifts.length)return;
+    let empTotalH=0;
+    html+=`<p style="font-weight:bold;color:#4f46e5;margin:14px 0 4px">${escHtml(e)}</p>`;
+    html+=`<table><thead><tr><th>日期</th><th>星期</th><th>上班</th><th>下班</th><th>工时</th><th>备注</th></tr></thead><tbody>`;
+    empShifts.forEach(s=>{
+      const d=parseDate(s.date),h=calcHours(s.startTime,s.endTime);empTotalH+=h;
+      html+=`<tr><td>${mn[d.getMonth()]}${d.getDate()}日</td><td align="center">${dn[(d.getDay()+6)%7]}</td><td align="center">${s.startTime}</td><td align="center">${s.endTime}</td><td align="center"><b>${h}h</b></td><td>${escHtml(s.taskLabel||'')}</td></tr>`;
+    });
+    html+=`<tr class="tr"><td colspan="4" align="right"><b>合计</b></td><td align="center"><b>${empTotalH.toFixed(1)}h</b></td><td></td></tr></tbody></table>`;
+  });
+  html+=`</body></html>`;
+  const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`排班统计_${startStr}_${endStr}.xls`;a.click();URL.revokeObjectURL(url);
+  showToast(t('toastExcelOk'),'success');
+}
+async function captureStats(){
+  const startStr=document.getElementById('reportStart').value,endStr=document.getElementById('reportEnd').value;
+  if(!startStr||!endStr){showToast(t('toastNoRange'),'warning');return;}
+  const btn=document.getElementById('statsScreenshotBtn');btn.textContent='⏳';btn.disabled=true;
+  try{
+    const shifts=DB.getShifts(),emps=DB.getEmployees(),selEmps=emps.filter(e=>selectedEmployees.has(e));
+    if(!selEmps.length){showToast(t('noEmpMsg'),'warning');btn.textContent='📷';btn.disabled=false;return;}
+    const totalTips=parseFloat(document.getElementById('totalTipsInput').value)||0;
+    const inRange=shifts.filter(s=>s.date>=startStr&&s.date<=endStr&&selectedEmployees.has(s.employeeName));
+    const empTotals={};selEmps.forEach(e=>{empTotals[e]=0;});
+    inRange.forEach(s=>{empTotals[s.employeeName]=(empTotals[s.employeeName]||0)+calcHours(s.startTime,s.endTime);});
+    const totalHours=Object.values(empTotals).reduce((a,b)=>a+b,0);
+    const totalAdjustedH=selEmps.reduce((sum,e)=>sum+Math.max(0,(empTotals[e]||0)-(excludedTimes[e]||0)),0);
+    const mn=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    const dn=['周一','周二','周三','周四','周五','周六','周日'];
+    const hasExclude=selEmps.some(e=>(excludedTimes[e]||0)>0);
+    const S='padding:8px 10px;border-bottom:1px solid #f1f5f9;',SH='padding:8px 10px;border-bottom:2px solid #e2e8f0;background:#f8fafc;font-size:12px;color:#64748b;font-weight:700;';
+    let html='';
+    // 标题卡片
+    html+='<div style="background:#fff;border-radius:10px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)">';
+    html+='<div style="font-size:20px;font-weight:800;color:#1e293b;margin-bottom:6px">排班统计报表</div>';
+    html+='<div style="font-size:13px;color:#64748b;margin-bottom:2px">📅 统计时间段：'+startStr+' 至 '+endStr+'</div>';
+    if(totalTips>0)html+='<div style="font-size:13px;color:#64748b">💰 总小费：$'+totalTips.toFixed(2)+'</div>';
+    html+='</div>';
+    // 工时汇总表
+    html+='<div style="background:#fff;border-radius:10px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)">';
+    html+='<div style="font-weight:700;font-size:14px;color:#4f46e5;margin-bottom:12px">📊 工时汇总</div>';
+    html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+    html+='<th style="'+SH+'text-align:left">员工</th>';
+    html+='<th style="'+SH+'text-align:center">总工时</th>';
+    html+='<th style="'+SH+'text-align:center">工时占比</th>';
+    if(hasExclude)html+='<th style="'+SH+'text-align:center">不计时间</th>';
+    html+='<th style="'+SH+'text-align:center">小费占比</th>';
+    html+='<th style="'+SH+'text-align:center">小费</th>';
+    html+='</tr></thead><tbody>';
+    selEmps.forEach(e=>{
+      const empH=empTotals[e]||0,color=getEmpColorByIndex(emps.indexOf(e));
+      const sharePct=totalHours>0?(empH/totalHours*100):0;
+      const excludedH=excludedTimes[e]||0,adjustedH=Math.max(0,empH-excludedH);
+      const tipsPct=totalAdjustedH>0?(adjustedH/totalAdjustedH*100):0;
+      const empTipsAmt=totalTips>0?'$'+(tipsPct/100*totalTips).toFixed(2):'—';
+      html+='<tr>';
+      html+='<td style="'+S+'text-align:left"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+color+';vertical-align:middle;margin-right:6px"></span><span style="font-weight:600;vertical-align:middle">'+escHtml(e)+'</span></td>';
+      html+='<td style="'+S+'text-align:center;font-weight:700;color:'+color+'">'+empH.toFixed(1)+'h</td>';
+      html+='<td style="'+S+'text-align:center">'+sharePct.toFixed(1)+'%</td>';
+      if(hasExclude)html+='<td style="'+S+'text-align:center">'+(excludedH>0?excludedH+'h':'—')+'</td>';
+      html+='<td style="'+S+'text-align:center;font-weight:700;color:#4f46e5">'+tipsPct.toFixed(1)+'%</td>';
+      html+='<td style="'+S+'text-align:center;font-weight:700;color:#10b981">'+empTipsAmt+'</td>';
+      html+='</tr>';
+    });
+    html+='<tr style="background:#e0e7ff">';
+    html+='<td style="padding:8px 10px;text-align:left;font-weight:700;color:#4f46e5">合计</td>';
+    html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#4f46e5">'+totalHours.toFixed(1)+'h</td>';
+    html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#4f46e5">100%</td>';
+    if(hasExclude)html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#4f46e5">—</td>';
+    html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#4f46e5">100%</td>';
+    html+='<td style="padding:8px 10px;text-align:center;font-weight:700;color:#10b981">'+(totalTips>0?'$'+totalTips.toFixed(2):'—')+'</td>';
+    html+='</tr></tbody></table></div>';
+    // 排班明细
+    if(inRange.length>0){
+      html+='<div style="background:#fff;border-radius:10px;padding:18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)">';
+      html+='<div style="font-weight:700;font-size:14px;color:#4f46e5;margin-bottom:14px">📋 员工排班明细</div>';
+      selEmps.forEach(e=>{
+        const empShifts=inRange.filter(s=>s.employeeName===e).sort((a,b)=>a.date.localeCompare(b.date));
+        if(!empShifts.length)return;
+        const color=getEmpColorByIndex(emps.indexOf(e));
+        let empTotalH=0;
+        html+='<div style="margin-bottom:18px">';
+        html+='<div style="padding:6px 0;border-bottom:2px solid '+color+';margin-bottom:8px">';
+        html+='<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+color+';vertical-align:middle;margin-right:8px"></span>';
+        html+='<span style="font-weight:700;font-size:13px;color:'+color+';vertical-align:middle">'+escHtml(e)+'</span>';
+        html+='<span style="font-size:11px;color:#94a3b8;margin-left:8px;vertical-align:middle">'+empShifts.length+'个班次</span></div>';
+        html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>';
+        empShifts.forEach(s=>{
+          const d=parseDate(s.date),h=calcHours(s.startTime,s.endTime);empTotalH+=h;
+          html+='<tr>';
+          html+='<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;font-weight:600">'+mn[d.getMonth()]+d.getDate()+'日 <span style="color:#94a3b8;font-weight:400">'+dn[(d.getDay()+6)%7]+'</span></td>';
+          html+='<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center;color:#10b981;font-weight:600">'+fmtTime(s.startTime)+'</td>';
+          html+='<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center;color:#94a3b8">→</td>';
+          html+='<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center;color:#f97316;font-weight:600">'+fmtTime(s.endTime)+'</td>';
+          html+='<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:center;color:'+color+';font-weight:700">'+h+'h</td>';
+          html+='<td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;color:#94a3b8;font-size:11px">'+escHtml(s.taskLabel||'')+'</td>';
+          html+='</tr>';
+        });
+        html+='<tr style="background:#e0e7ff"><td colspan="4" style="padding:6px 10px;text-align:right;font-weight:700;color:#4f46e5">合计</td>';
+        html+='<td style="padding:6px 10px;text-align:center;font-weight:800;color:'+color+'">'+empTotalH.toFixed(1)+'h</td><td></td></tr>';
+        html+='</tbody></table></div>';
+      });
+      html+='</div>';
+    }
+    html+='<div style="text-align:center;font-size:11px;color:#94a3b8;padding-top:4px">排班统计系统 · '+new Date().toLocaleDateString('zh-CN')+'</div>';
+    const wrapper=document.createElement('div');
+    wrapper.style.cssText='position:absolute;top:0;left:-9999px;width:750px;background:#f1f5f9;padding:20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#1e293b;line-height:1.5;font-size:13px';
+    wrapper.innerHTML=html;
+    document.body.appendChild(wrapper);
+    const canvas=await html2canvas(wrapper,{backgroundColor:'#f1f5f9',scale:2,useCORS:true,scrollX:0,scrollY:0,width:wrapper.offsetWidth,windowWidth:wrapper.offsetWidth+40,logging:false});
+    document.body.removeChild(wrapper);
+    const fileName='排班统计_'+startStr+'_'+endStr+'.png';
+    const dataUrl=canvas.toDataURL('image/png');
+    if(typeof navigator.canShare==='function'){
+      const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
+      const file=new File([blob],fileName,{type:'image/png'});
+      if(navigator.canShare({files:[file]})){
+        try{await navigator.share({files:[file],title:'排班统计'});btn.textContent='📷';btn.disabled=false;return;}
+        catch(e){if(e.name==='AbortError'){btn.textContent='📷';btn.disabled=false;return;}}
+      }
+    }
+    showImageModal(dataUrl,fileName);
+  }catch(e){showToast('截图失败：'+e.message,'error');}
+  btn.textContent='📷';btn.disabled=false;
+}
 function setExcludedTime(emp,val){excludedTimes[emp]=parseFloat(val)||0;renderReports();}
 function openSettings(){renderEmpMgmtList();['curPw','newPw','newPw2'].forEach(id=>document.getElementById(id).value='');document.getElementById('pwChangeError').classList.add('hidden');document.getElementById('newEmpName').value='';document.getElementById('empMgmtError').classList.add('hidden');openModal('settingsModal');}
 function openQuickSchedule(){
