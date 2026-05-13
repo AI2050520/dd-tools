@@ -102,6 +102,40 @@
     .vol-fill{height:100%;border-radius:4px}
     .anote{font-size:.76rem;color:var(--text-muted);line-height:1.7;padding:10px 12px;background:var(--bg);border-radius:8px;margin-top:10px}
     .adata-err{color:var(--danger);font-size:.8rem;padding:6px 0}
+    /* ── Daily Analysis Tab ── */
+    .daily-card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px;border-left:4px solid var(--primary)}
+    .daily-card.bull{border-left-color:var(--success)}.daily-card.bear{border-left-color:var(--danger)}.daily-card.neutral{border-left-color:var(--warning)}
+    .daily-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+    .daily-date{font-size:1rem;font-weight:800;color:var(--text)}
+    .daily-signal{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:10px}
+    .daily-signal.bull{background:#d1fae5;color:#065f46}.daily-signal.bear{background:#fee2e2;color:#991b1b}.daily-signal.neutral{background:#fef3c7;color:#92400e}
+    .daily-metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:14px}
+    .dmetric{background:var(--bg);border-radius:8px;padding:8px 10px;text-align:center}
+    .dmetric-label{font-size:.62rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+    .dmetric-value{font-size:.95rem;font-weight:800;color:var(--text)}
+    .dmetric-value.up{color:var(--success)}.dmetric-value.down{color:var(--danger)}
+    .daily-pred{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+    .dpred{border-radius:8px;padding:10px 8px;text-align:center}
+    .dpred-label{font-size:.6rem;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:3px}
+    .dpred-value{font-size:1rem;font-weight:800;color:#fff}
+    .dp-o{background:linear-gradient(135deg,#4f46e5,#7c3aed)}.dp-h{background:linear-gradient(135deg,#059669,#0d9488)}
+    .dp-l{background:linear-gradient(135deg,#dc2626,#9f1239)}.dp-c{background:linear-gradient(135deg,#d97706,#b45309)}
+    .daily-analysis{font-size:.83rem;color:var(--text-muted);line-height:1.75;background:var(--bg);border-radius:8px;padding:12px 14px}
+    .daily-headline{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.4}
+    .daily-actual{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}
+    .dactual{text-align:center}
+    .dactual-label{font-size:.6rem;color:var(--text-muted);font-weight:600}
+    .dactual-value{font-size:.88rem;font-weight:700;color:var(--text)}
+    /* ── Daily Metrics Row Layout ── */
+    .daily-metrics-list{margin-bottom:14px;background:var(--bg);border-radius:10px;padding:6px 12px}
+    .dmetric-row{display:flex;align-items:baseline;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;row-gap:3px}
+    .dmetric-row:last-child{border-bottom:none}
+    .dmetric-name{font-size:.65rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em;min-width:68px;flex-shrink:0}
+    .dmetric-val{font-size:.9rem;font-weight:800;color:var(--text);min-width:60px;flex-shrink:0}
+    .dmetric-val.up{color:var(--success)}.dmetric-val.down{color:var(--danger)}
+    .dmetric-cmp{font-size:.74rem;color:var(--text-light);flex-shrink:0}
+    .dmetric-cmp .pos{color:var(--success)}.dmetric-cmp .neg{color:var(--danger)}
+    .dmetric-interp{font-size:.73rem;color:var(--text-muted);flex:1;min-width:160px;line-height:1.45}
   </style>
 </head>
 <body>
@@ -141,6 +175,7 @@
     <button class="tab-btn active" id="tabNews" onclick="switchTab('news')">📰 <span id="tabNewsLabel">市场消息</span></button>
     <button class="tab-btn" id="tabPos" onclick="switchTab('positions')">📋 <span id="tabPosLabel">持仓动向</span></button>
     <button class="tab-btn" id="tabAnalysis" onclick="switchTab('analysis')">📊 <span id="tabAnalysisLabel">市场分析</span></button>
+    <button class="tab-btn" id="tabDaily" onclick="switchTab('daily')">📅 <span id="tabDailyLabel">每日分析</span></button>
   </div>
 
   <div id="alertList" class="alert-list">
@@ -151,6 +186,9 @@
   </div>
   <div id="analysisPanel" class="hidden">
     <div id="analysisInner"><div class="loading">正在获取市场数据…</div></div>
+  </div>
+  <div id="dailyPanel" class="alert-list hidden">
+    <div class="loading">加载中…</div>
   </div>
 </div>
 
@@ -175,7 +213,7 @@ const LANG={
   zh:{
     brand:'股市追踪',headerTitle:'📈 股市追踪',headerSubtitle:'重要市场消息自动推送 · 周一至周五',
     nextBriefLabel:'下次早报',refresh:'刷新',back:'工具箱',langBtn:'EN',
-    tabNews:'市场消息',tabPos:'持仓动向',tabAnalysis:'市场分析',
+    tabNews:'市场消息',tabPos:'持仓动向',tabAnalysis:'市场分析',tabDaily:'每日分析',
     breaking:'🚨 突发消息',scheduled:'⏰ 定时早报',
     insider:'📋 内部人交易',congress:'🏛️ 国会议员',
     buy:'买入',sell:'卖出',
@@ -186,7 +224,7 @@ const LANG={
   en:{
     brand:'Market Tracker',headerTitle:'📈 Market Tracker',headerSubtitle:'Auto-push important news · Mon–Fri',
     nextBriefLabel:'Next Brief',refresh:'Refresh',back:'Toolbox',langBtn:'中文',
-    tabNews:'Market News',tabPos:'Position Flow',tabAnalysis:'Analysis',
+    tabNews:'Market News',tabPos:'Position Flow',tabAnalysis:'Analysis',tabDaily:'Daily Forecast',
     breaking:'🚨 Breaking',scheduled:'⏰ Morning Brief',
     insider:'📋 Insider Trade',congress:'🏛️ Congress',
     buy:'Buy',sell:'Sell',
@@ -208,6 +246,7 @@ function applyLang(){
   document.getElementById('tabNewsLabel').textContent=L.tabNews;
   document.getElementById('tabPosLabel').textContent=L.tabPos;
   document.getElementById('tabAnalysisLabel').textContent=L.tabAnalysis;
+  document.getElementById('tabDailyLabel').textContent=L.tabDaily;
   document.title=L.brand;
   updateNextBriefTime();
 }
@@ -224,16 +263,20 @@ function switchTab(tab){
   document.getElementById('tabNews').classList.toggle('active',tab==='news');
   document.getElementById('tabPos').classList.toggle('active',tab==='positions');
   document.getElementById('tabAnalysis').classList.toggle('active',tab==='analysis');
+  document.getElementById('tabDaily').classList.toggle('active',tab==='daily');
   document.getElementById('alertList').classList.toggle('hidden',tab!=='news');
   document.getElementById('positionList').classList.toggle('hidden',tab!=='positions');
   document.getElementById('analysisPanel').classList.toggle('hidden',tab!=='analysis');
+  document.getElementById('dailyPanel').classList.toggle('hidden',tab!=='daily');
   if(tab==='positions'&&lastPosSnap===null)loadPositions();
   if(tab==='analysis')loadAnalysis();
+  if(tab==='daily'&&lastDailySnap===null)loadDaily();
 }
 
 function refreshCurrent(){
   if(activeTab==='news')loadAlerts();
   else if(activeTab==='positions')loadPositions();
+  else if(activeTab==='daily'){lastDailySnap=null;loadDaily();}
   else{lastAnalysisTime=0;loadAnalysis();}
 }
 
@@ -339,6 +382,231 @@ function renderPositions(snap){
       </div>
       <div class="pos-headline">${d.headline||''}</div>
       ${detail}
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  DAILY FORECAST RECORDS
+// ══════════════════════════════════════════════
+let lastDailySnap=null;
+
+async function loadDaily(){
+  document.getElementById('dailyPanel').innerHTML=`<div class="loading">${LANG[lang].loading}</div>`;
+  try{
+    const snap=await _fs.collection('daily-analysis').orderBy('timestamp','desc').limit(30).get();
+    lastDailySnap=snap;
+    renderDaily(snap);
+  }catch(e){
+    document.getElementById('dailyPanel').innerHTML=`<div class="stocks-empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+function renderDaily(snap){
+  const listEl=document.getElementById('dailyPanel');
+  if(!snap||snap.empty){
+    listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📅</div><div>暂无每日分析记录<br><span style="font-size:.82rem;color:var(--text-light)">后台每个交易日 6:25 AM LA 时间自动写入</span></div></div>`;
+    return;
+  }
+
+  // build one metric row: name | current value | (昨 prev, delta) | interpretation
+  function mrow(name,curStr,valCls,prevStr,deltaStr,deltaCls,interp){
+    const cmpHtml=prevStr
+      ?`<span class="dmetric-cmp">（昨 ${prevStr}${deltaStr?` <span class="${deltaCls}">${deltaStr}</span>`:''  }）</span>`
+      :'';
+    const interpHtml=interp?`<span class="dmetric-interp">${interp}</span>`:'';
+    return `<div class="dmetric-row"><span class="dmetric-name">${name}</span><span class="dmetric-val ${valCls}">${curStr}</span>${cmpHtml}${interpHtml}</div>`;
+  }
+
+  listEl.innerHTML=snap.docs.map((doc,idx)=>{
+    const d=doc.data();
+    const p=snap.docs[idx+1]?.data(); // previous entry (docs are desc-sorted, so idx+1 is older)
+    const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp||Date.now());
+    const dateStr=ts.toLocaleString(lang==='zh'?'zh-CN':'en-US',{year:'numeric',month:'short',day:'numeric',weekday:'short',timeZone:'America/Los_Angeles'})+' LA';
+    const sig=d.signal||'neutral';
+    const sigLabel=sig==='bull'?'📈 看涨':sig==='bear'?'📉 看跌':'⚖️ 中性';
+
+    // ── SPX Close ─────────────────────────────────
+    const spxC=d.spxClose!=null?Math.round(d.spxClose):null;
+    const spxP=p?.spxClose!=null?Math.round(p.spxClose):null;
+    let spxDelta='',spxDCls='',spxInterp='';
+    if(spxC!=null&&spxP!=null){
+      const diff=spxC-spxP,pct=(diff/spxP*100).toFixed(2);
+      spxDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toLocaleString()+' ('+pct+'%)';
+      spxDCls=diff>=0?'pos':'neg';
+      if(diff>50)spxInterp='强劲反弹，多头动能充足';
+      else if(diff>0)spxInterp='小幅上涨，市场偏多';
+      else if(diff>-50)spxInterp='小幅下跌，偏空但跌幅有限';
+      else spxInterp='大幅下跌，空头占主导';
+    }
+    const spxRow=mrow('SPX 昨收',spxC!=null?spxC.toLocaleString():'—','',spxP!=null?spxP.toLocaleString():null,spxDelta,spxDCls,spxInterp);
+
+    // ── VIX ───────────────────────────────────────
+    const vixC=d.vix!=null?parseFloat(d.vix):null;
+    const vixP=p?.vix!=null?parseFloat(p.vix):null;
+    let vixDelta='',vixDCls='',vixInterp='';
+    if(vixC!=null&&vixP!=null){
+      const diff=vixC-vixP;
+      vixDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(1);
+      vixDCls=diff>=0?'neg':'pos';
+      if(diff>3)vixInterp='VIX大幅上升，恐慌情绪急剧升温，注意风险';
+      else if(diff>0)vixInterp='VIX小幅上升，市场略趋紧张';
+      else if(diff<-3)vixInterp='VIX明显下降，恐慌消退，市场趋稳';
+      else vixInterp='VIX小幅下降，市场情绪平稳';
+    }
+    if(!vixInterp&&vixC!=null){
+      if(vixC>30)vixInterp='极度恐慌，市场非常不稳定，波动率极高';
+      else if(vixC>20)vixInterp='恐慌情绪较高，波动较大';
+      else if(vixC>15)vixInterp='略有担忧，轻微波动';
+      else vixInterp='市场平静，波动率低，趋势偏稳';
+    }
+    const vixCls=vixC!=null?(vixC>25?'down':vixC<15?'up':''):'';
+    const vixRow=mrow('VIX 恐慌',vixC!=null?vixC.toFixed(1):'—',vixCls,vixP!=null?vixP.toFixed(1):null,vixDelta,vixDCls,vixInterp);
+
+    // ── DIX ───────────────────────────────────────
+    const dixC=d.dix!=null?parseFloat(d.dix):null;
+    const dixP=p?.dix!=null?parseFloat(p.dix):null;
+    let dixDelta='',dixDCls='',dixInterp='';
+    if(dixC!=null&&dixP!=null){
+      const diff=dixC-dixP;
+      dixDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(1)+'%';
+      dixDCls=diff>=0?'pos':'neg';
+    }
+    if(dixC!=null){
+      if(dixC>45){
+        if(dixP!=null&&dixC>dixP)dixInterp='暗池买盘持续增加，机构看涨信号强烈，多头支撑有力';
+        else dixInterp='暗池大量买入，机构看涨，对后市偏乐观';
+      }else if(dixC>40){
+        dixInterp='暗池活动正常，机构情绪中性';
+      }else{
+        if(dixP!=null&&dixC<dixP)dixInterp='暗池买盘持续减少，机构趋于谨慎，留意下行风险';
+        else dixInterp='暗池买盘偏低，机构参与度不足，多头动能弱';
+      }
+    }
+    const dixCls=dixC!=null?(dixC>45?'up':dixC<40?'down':''):'';
+    const dixRow=mrow('DIX 暗池',dixC!=null?dixC.toFixed(1)+'%':'—',dixCls,dixP!=null?dixP.toFixed(1)+'%':null,dixDelta,dixDCls,dixInterp);
+
+    // ── GEX ───────────────────────────────────────
+    const gexC=d.gex!=null?parseFloat(d.gex):null;
+    const gexP=p?.gex!=null?parseFloat(p.gex):null;
+    let gexDelta='',gexDCls='',gexInterp='';
+    if(gexC!=null&&gexP!=null){
+      const diff=gexC-gexP,ab=Math.abs(diff);
+      const ds=ab>=1e9?(ab/1e9).toFixed(1)+'B':ab>=1e6?(ab/1e6).toFixed(0)+'M':(ab/1e3).toFixed(0)+'K';
+      gexDelta=(diff>=0?'↑+':'↓-')+ds;
+      gexDCls=diff>=0?'pos':'neg';
+      if(gexC>0&&gexP>0){
+        gexInterp=gexC>gexP
+          ?'正Gamma且上升，做市商承托力增强，越跌越买，稳定性强'
+          :'正Gamma但下降，仍为正数，越跌做市商仍会买入承托，但力度有所减弱';
+      }else if(gexC>0&&gexP<=0){
+        gexInterp='GEX由负转正，做市商开始承托市场，波动趋于收敛，有利于稳市';
+      }else if(gexC<=0&&gexP>0){
+        gexInterp='GEX由正转负，做市商承托消失，市场波动性增加，注意较大波动';
+      }else{
+        gexInterp=gexC<gexP
+          ?'负Gamma且继续下降，做市商放大波动，越跌越卖，大波动风险高'
+          :'负Gamma但有所收窄，波动放大效应略减弱，仍需谨慎';
+      }
+    }else if(gexC!=null){
+      gexInterp=gexC>0?'正Gamma，做市商承托市场，越跌越买，抑制下行波动':'负Gamma，做市商放大波动，市场方向性强但波动风险大';
+    }
+    const gexCls=gexC!=null?(gexC>0?'up':'down'):'';
+    const gexRow=mrow('GEX 期权',gexC!=null?gexStr(gexC):'—',gexCls,gexP!=null?gexStr(gexP):null,gexDelta,gexDCls,gexInterp);
+
+    // ── P/C Ratio ─────────────────────────────────
+    const pcC=d.pcRatio!=null?parseFloat(d.pcRatio):null;
+    const pcP=p?.pcRatio!=null?parseFloat(p.pcRatio):null;
+    let pcDelta='',pcDCls='',pcInterp='';
+    if(pcC!=null&&pcP!=null){
+      const diff=pcC-pcP;
+      pcDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(2);
+      pcDCls=diff>=0?'neg':'pos';
+    }
+    if(pcC!=null){
+      if(pcC>1.2)pcInterp='期权市场极度悲观，看跌情绪浓，反向信号或接近阶段低点';
+      else if(pcC>1.0)pcInterp='偏向看跌，市场情绪谨慎，下行压力偏大';
+      else if(pcC>0.7)pcInterp='期权情绪中性偏乐观，市场稳定';
+      else pcInterp='市场过于乐观，看涨期权过多，注意潜在回调风险';
+    }
+    const pcCls=pcC!=null?(pcC>1.05?'down':pcC<0.7?'up':''):'';
+    const pcRow=mrow('P/C 比',pcC!=null?pcC.toFixed(2):'—',pcCls,pcP!=null?pcP.toFixed(2):null,pcDelta,pcDCls,pcInterp);
+
+    // ── ES Futures ────────────────────────────────
+    const esC=d.futuresChg!=null?parseFloat(d.futuresChg):null;
+    const esP=p?.futuresChg!=null?parseFloat(p.futuresChg):null;
+    let esDelta='',esDCls='',esInterp='';
+    if(esC!=null&&esP!=null){
+      const diff=esC-esP;
+      esDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(2)+'%';
+      esDCls=diff>=0?'pos':'neg';
+    }
+    if(esC!=null){
+      if(esC>1)esInterp='期货大幅高开，预计强势开盘，多头动能强劲';
+      else if(esC>0.2)esInterp='期货小幅高开，预计高开，多头略占优';
+      else if(esC>-0.2)esInterp='期货基本平开，开盘方向不明确';
+      else if(esC>-1)esInterp='期货小幅低开，预计低开，空头略占优';
+      else esInterp='期货大幅低开，预计弱势开盘，空头主导';
+    }
+    const esCls=esC!=null?(esC>=0?'up':'down'):'';
+    const esStr=esC!=null?(esC>=0?'+':'')+esC.toFixed(2)+'%':'—';
+    const esPStr=esP!=null?(esP>=0?'+':'')+esP.toFixed(2)+'%':null;
+    const esRow=mrow('ES 期货',esStr,esCls,esPStr,esDelta,esDCls,esInterp);
+
+    // ── 10Y Yield ─────────────────────────────────
+    const yldC=d.yield10y!=null?parseFloat(d.yield10y):null;
+    const yldP=p?.yield10y!=null?parseFloat(p.yield10y):null;
+    let yldDelta='',yldDCls='',yldInterp='';
+    if(yldC!=null&&yldP!=null){
+      const diff=yldC-yldP;
+      yldDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(3)+'%';
+      yldDCls=diff>=0?'neg':'pos';
+      if(diff>0.1)yldInterp='美债收益率大幅上升，对科技股等成长股压力明显增大';
+      else if(diff>0)yldInterp='美债收益率小幅上升，对股市轻微承压';
+      else if(diff<-0.1)yldInterp='美债收益率明显下降，流动性改善，对股市偏利好';
+      else yldInterp='美债收益率小幅下降，利率压力略有减轻';
+    }
+    if(!yldInterp&&yldC!=null){
+      if(yldC>4.5)yldInterp='收益率偏高，对科技股及成长股持续承压';
+      else if(yldC>4.0)yldInterp='收益率中等偏高，股市压力可控';
+      else yldInterp='收益率较低，利率环境相对友好';
+    }
+    const yldRow=mrow('10Y 美债',yldC!=null?yldC.toFixed(3)+'%':'—','',yldP!=null?yldP.toFixed(3)+'%':null,yldDelta,yldDCls,yldInterp);
+
+    const metricsHtml=`<div class="daily-metrics-list">${spxRow}${vixRow}${dixRow}${gexRow}${pcRow}${esRow}${yldRow}</div>`;
+
+    // 预测 OHLC
+    let predHtml='';
+    if(d.predOpen||d.predHigh||d.predLow||d.predClose){
+      predHtml=`<div class="daily-pred">
+        <div class="dpred dp-o"><div class="dpred-label">🔔 预计开盘</div><div class="dpred-value">${d.predOpen?Math.round(d.predOpen).toLocaleString():'—'}</div></div>
+        <div class="dpred dp-h"><div class="dpred-label">🟢 预计最高</div><div class="dpred-value">${d.predHigh?Math.round(d.predHigh).toLocaleString():'—'}</div></div>
+        <div class="dpred dp-l"><div class="dpred-label">🔴 预计最低</div><div class="dpred-value">${d.predLow?Math.round(d.predLow).toLocaleString():'—'}</div></div>
+        <div class="dpred dp-c"><div class="dpred-label">🏁 预计收盘</div><div class="dpred-value">${d.predClose?Math.round(d.predClose).toLocaleString():'—'}</div></div>
+      </div>`;
+    }
+
+    // 实际 OHLC（收盘后填入）
+    let actualHtml='';
+    if(d.actualOpen||d.actualHigh||d.actualLow||d.actualClose){
+      actualHtml=`<div class="daily-actual">
+        <div class="dactual"><div class="dactual-label">实际开盘</div><div class="dactual-value">${d.actualOpen?Math.round(d.actualOpen).toLocaleString():'—'}</div></div>
+        <div class="dactual"><div class="dactual-label">实际最高</div><div class="dactual-value" style="color:var(--success)">${d.actualHigh?Math.round(d.actualHigh).toLocaleString():'—'}</div></div>
+        <div class="dactual"><div class="dactual-label">实际最低</div><div class="dactual-value" style="color:var(--danger)">${d.actualLow?Math.round(d.actualLow).toLocaleString():'—'}</div></div>
+        <div class="dactual"><div class="dactual-label">实际收盘</div><div class="dactual-value">${d.actualClose?Math.round(d.actualClose).toLocaleString():'—'}</div></div>
+      </div>`;
+    }
+
+    return `<div class="daily-card ${sig}">
+      <div class="daily-header">
+        <span class="daily-date">${dateStr}</span>
+        <span class="daily-signal ${sig}">${sigLabel}</span>
+        ${d.score!=null?`<span style="font-size:.75rem;color:var(--text-muted)">综合评分 ${d.score>0?'+':''}${d.score}</span>`:''}
+      </div>
+      ${d.headline?`<div class="daily-headline">${d.headline}</div>`:''}
+      ${metricsHtml}
+      ${predHtml}
+      ${d.analysis?`<div class="daily-analysis">${d.analysis}${actualHtml}</div>`:actualHtml}
     </div>`;
   }).join('');
 }
