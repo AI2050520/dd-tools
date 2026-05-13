@@ -241,8 +241,15 @@ function updateNextBriefTime(){
   const now=new Date();
   const la=new Date(now.toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
   const day=la.getDay(),h=la.getHours(),m=la.getMinutes();
-  let daysUntil=((1-day+7)%7)||((h>6||(h===6&&m>=25))?7:0);
-  const next=new Date(la);next.setDate(la.getDate()+daysUntil);next.setHours(6,25,0,0);
+  const isWeekday=day>=1&&day<=5;
+  const pastBrief=h>6||(h===6&&m>=25);
+  let add=0;
+  if(isWeekday&&!pastBrief){add=0;}        // 今天工作日且未到6:25 → 今天
+  else if(day===5&&pastBrief){add=3;}      // 周五过后 → 下周一
+  else if(day===6){add=2;}                 // 周六 → 下周一
+  else if(day===0){add=1;}                 // 周日 → 周一
+  else{add=1;}                             // 工作日过后 → 明天
+  const next=new Date(la);next.setDate(la.getDate()+add);next.setHours(6,25,0,0);
   const opts={weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'};
   document.getElementById('nextBriefTime').textContent=next.toLocaleString(lang==='zh'?'zh-CN':'en-US',opts)+' LA';
 }
