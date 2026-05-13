@@ -187,8 +187,14 @@
   <div id="analysisPanel" class="hidden">
     <div id="analysisInner"><div class="loading">正在获取市场数据…</div></div>
   </div>
-  <div id="dailyPanel" class="alert-list hidden">
-    <div class="loading">加载中…</div>
+  <div id="dailyPanel" class="hidden">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;background:var(--card);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow);flex-wrap:wrap">
+      <button id="analyzeNowBtn" onclick="triggerAnalysis()" style="background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:.875rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">⚡ 立即分析</button>
+      <span id="analyzeNowStatus" style="font-size:.82rem;color:var(--text-muted);flex:1">分析结果将推送至 Telegram 并保存在此页面</span>
+    </div>
+    <div id="dailyList" class="alert-list">
+      <div class="loading">加载中…</div>
+    </div>
   </div>
 </div>
 
@@ -278,6 +284,38 @@ function refreshCurrent(){
   else if(activeTab==='positions')loadPositions();
   else if(activeTab==='daily'){lastDailySnap=null;loadDaily();}
   else{lastAnalysisTime=0;loadAnalysis();}
+}
+
+async function triggerAnalysis(){
+  const btn=document.getElementById('analyzeNowBtn');
+  const status=document.getElementById('analyzeNowStatus');
+  btn.disabled=true;
+  btn.textContent='⏳ 分析中…';
+  status.textContent='正在抓取实时数据并生成分析，约30-60秒…';
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),120000);
+  try{
+    const res=await fetch('http://localhost:3001/analyze-now',{method:'POST',signal:ctrl.signal});
+    clearTimeout(tid);
+    if(res.status===429){status.textContent='⏳ 分析正在进行中，请稍候再试';return;}
+    const data=await res.json();
+    if(data.ok){
+      status.textContent='✅ 分析完成！正在刷新…';
+      await new Promise(r=>setTimeout(r,1500));
+      lastDailySnap=null;
+      await loadDaily();
+      status.textContent='分析结果已更新，同时已推送至 Telegram';
+    }else{
+      status.textContent='❌ 分析失败：'+(data.error||'未知错误');
+    }
+  }catch(e){
+    clearTimeout(tid);
+    if(e.name==='AbortError'){status.textContent='❌ 请求超时，请重试';}
+    else{status.textContent='❌ 无法连接分析服务（请确认股票追踪器正在运行）';}
+  }finally{
+    btn.disabled=false;
+    btn.textContent='⚡ 立即分析';
+  }
 }
 
 function updateNextBriefTime(){
@@ -392,18 +430,18 @@ function renderPositions(snap){
 let lastDailySnap=null;
 
 async function loadDaily(){
-  document.getElementById('dailyPanel').innerHTML=`<div class="loading">${LANG[lang].loading}</div>`;
+  document.getElementById('dailyList').innerHTML=`<div class="loading">${LANG[lang].loading}</div>`;
   try{
     const snap=await _fs.collection('daily-analysis').orderBy('timestamp','desc').limit(30).get();
     lastDailySnap=snap;
     renderDaily(snap);
   }catch(e){
-    document.getElementById('dailyPanel').innerHTML=`<div class="stocks-empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
+    document.getElementById('dailyList').innerHTML=`<div class="stocks-empty"><div class="empty-icon">⚠️</div><div>${e.message}</div></div>`;
   }
 }
 
 function renderDaily(snap){
-  const listEl=document.getElementById('dailyPanel');
+  const listEl=document.getElementById('dailyList');
   if(!snap||snap.empty){
     listEl.innerHTML=`<div class="stocks-empty"><div class="empty-icon">📅</div><div>暂无每日分析记录<br><span style="font-size:.82rem;color:var(--text-light)">后台每个交易日 6:25 AM LA 时间自动写入</span></div></div>`;
     return;
@@ -573,7 +611,48 @@ function renderDaily(snap){
     }
     const yldRow=mrow('10Y 美债',yldC!=null?yldC.toFixed(3)+'%':'—','',yldP!=null?yldP.toFixed(3)+'%':null,yldDelta,yldDCls,yldInterp);
 
-    const metricsHtml=`<div class="daily-metrics-list">${spxRow}${vixRow}${dixRow}${gexRow}${pcRow}${esRow}${yldRow}</div>`;
+    // ── CNN Fear & Greed ──────────────────────────
+    const fgC=d.fearGreed!=null?parseFloat(d.fearGreed):null;
+    const fgP=p?.fearGreed!=null?parseFloat(p.fearGreed):null;
+    let fgDelta='',fgDCls='',fgInterp='';
+    function fgLabel(v){return v<25?'极度恐惧':v<45?'恐惧':v<55?'中性':v<75?'贪婪':'极度贪婪';}
+    if(fgC!=null&&fgP!=null){
+      const diff=fgC-fgP;
+      fgDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(0);
+      fgDCls=diff>=0?'pos':'neg';
+    }
+    if(fgC!=null){
+      if(fgC>75)fgInterp='市场极度贪婪，历史上往往是阶段顶部的逆向信号，注意回调风险';
+      else if(fgC>55)fgInterp='市场偏贪婪，情绪乐观，但需警惕过热';
+      else if(fgC>45)fgInterp='市场情绪中性，多空均衡';
+      else if(fgC>25)fgInterp='市场偏恐惧，历史上常见于阶段底部附近，可关注逆向机会';
+      else fgInterp='市场极度恐惧，逆向买入信号较强，但需等待企稳确认';
+    }
+    const fgCls=fgC!=null?(fgC>55?'up':fgC<45?'down':''):'';
+    const fgStr=fgC!=null?Math.round(fgC)+'/100 ('+( d.fearGreedRating||fgLabel(fgC))+')':'—';
+    const fgPStr=fgP!=null?Math.round(fgP)+'/100 ('+fgLabel(fgP)+')':null;
+    const fgRow=mrow('贪婪恐惧',fgStr,fgCls,fgPStr,fgDelta,fgDCls,fgInterp);
+
+    // ── SPX PE ────────────────────────────────────
+    const peC=d.spxPE!=null?parseFloat(d.spxPE):null;
+    const peP=p?.spxPE!=null?parseFloat(p.spxPE):null;
+    let peDelta='',peDCls='',peInterp='';
+    if(peC!=null&&peP!=null){
+      const diff=peC-peP;
+      peDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(1)+'x';
+      peDCls=diff>=0?'neg':'pos';
+    }
+    if(peC!=null){
+      if(peC>30)peInterp='市盈率极高(>30x)，市场明显高估，业绩需大幅超预期才能支撑';
+      else if(peC>25)peInterp='市盈率偏高(>25x)，估值有压力，需良好业绩支撑（历史均值15-18x）';
+      else if(peC>20)peInterp='市盈率高于历史均值(15-18x)，在低利率环境下尚可，但有泡沫风险';
+      else if(peC>15)peInterp='市盈率接近历史均值，估值较为合理';
+      else peInterp='市盈率低于历史均值，估值偏低，或存在低估机会';
+    }
+    const peCls=peC!=null?(peC>25?'down':peC<18?'up':''):'';
+    const peRow=peC!=null?mrow('SPX PE',peC.toFixed(1)+'x',peCls,peP!=null?peP.toFixed(1)+'x':null,peDelta,peDCls,peInterp):'';
+
+    const metricsHtml=`<div class="daily-metrics-list">${spxRow}${vixRow}${dixRow}${gexRow}${pcRow}${esRow}${yldRow}${fgRow}${peRow}</div>`;
 
     // 预测 OHLC
     let predHtml='';
