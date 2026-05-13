@@ -77,6 +77,31 @@
     .stocks-empty{text-align:center;padding:60px 20px;color:var(--text-light)}
     .stocks-empty .empty-icon{font-size:3rem;margin-bottom:12px}
     .loading{text-align:center;padding:40px;color:var(--text-muted)}
+    /* ── Analysis Tab ── */
+    .analysis-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));margin-bottom:14px}
+    .data-card{background:var(--card);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);text-align:center;border-top:3px solid var(--border)}
+    .data-card.up{border-top-color:var(--success)}.data-card.up .data-card-value{color:var(--success)}
+    .data-card.down{border-top-color:var(--danger)}.data-card.down .data-card-value{color:var(--danger)}
+    .data-card-label{font-size:.68rem;color:var(--text-muted);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+    .data-card-value{font-size:1.3rem;font-weight:800;color:var(--text)}
+    .data-card-sub{font-size:.72rem;color:var(--text-light);margin-top:3px}
+    .asec{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:14px}
+    .asec-title{font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .signal-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+    .signal-row:last-child{border-bottom:none}
+    .signal-label{font-size:.82rem;color:var(--text-muted)}
+    .sbadge{font-size:.7rem;font-weight:700;padding:3px 9px;border-radius:10px}
+    .sbadge.bull{background:#d1fae5;color:#065f46}.sbadge.bear{background:#fee2e2;color:#991b1b}.sbadge.neutral{background:#f3f4f6;color:#6b7280}
+    .pred-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+    .pred-box{border-radius:10px;padding:14px 12px;text-align:center}
+    .pred-box-label{font-size:.68rem;font-weight:700;color:rgba(255,255,255,.8);margin-bottom:5px}
+    .pred-box-value{font-size:1.4rem;font-weight:800;color:#fff}
+    .pbox-o{background:linear-gradient(135deg,#4f46e5,#7c3aed)}.pbox-h{background:linear-gradient(135deg,#059669,#0d9488)}
+    .pbox-l{background:linear-gradient(135deg,#dc2626,#9f1239)}.pbox-c{background:linear-gradient(135deg,#d97706,#b45309)}
+    .vol-meter{height:8px;border-radius:4px;background:var(--border);margin:8px 0;overflow:hidden}
+    .vol-fill{height:100%;border-radius:4px}
+    .anote{font-size:.76rem;color:var(--text-muted);line-height:1.7;padding:10px 12px;background:var(--bg);border-radius:8px;margin-top:10px}
+    .adata-err{color:var(--danger);font-size:.8rem;padding:6px 0}
   </style>
 </head>
 <body>
@@ -115,6 +140,7 @@
   <div class="tab-bar">
     <button class="tab-btn active" id="tabNews" onclick="switchTab('news')">📰 <span id="tabNewsLabel">市场消息</span></button>
     <button class="tab-btn" id="tabPos" onclick="switchTab('positions')">📋 <span id="tabPosLabel">持仓动向</span></button>
+    <button class="tab-btn" id="tabAnalysis" onclick="switchTab('analysis')">📊 <span id="tabAnalysisLabel">市场分析</span></button>
   </div>
 
   <div id="alertList" class="alert-list">
@@ -122,6 +148,9 @@
   </div>
   <div id="positionList" class="alert-list hidden">
     <div class="loading">加载中…</div>
+  </div>
+  <div id="analysisPanel" class="hidden">
+    <div id="analysisInner"><div class="loading">正在获取市场数据…</div></div>
   </div>
 </div>
 
@@ -146,7 +175,7 @@ const LANG={
   zh:{
     brand:'股市追踪',headerTitle:'📈 股市追踪',headerSubtitle:'重要市场消息自动推送 · 周一至周五',
     nextBriefLabel:'下次早报',refresh:'刷新',back:'工具箱',langBtn:'EN',
-    tabNews:'市场消息',tabPos:'持仓动向',
+    tabNews:'市场消息',tabPos:'持仓动向',tabAnalysis:'市场分析',
     breaking:'🚨 突发消息',scheduled:'⏰ 定时早报',
     insider:'📋 内部人交易',congress:'🏛️ 国会议员',
     buy:'买入',sell:'卖出',
@@ -157,7 +186,7 @@ const LANG={
   en:{
     brand:'Market Tracker',headerTitle:'📈 Market Tracker',headerSubtitle:'Auto-push important news · Mon–Fri',
     nextBriefLabel:'Next Brief',refresh:'Refresh',back:'Toolbox',langBtn:'中文',
-    tabNews:'Market News',tabPos:'Position Flow',
+    tabNews:'Market News',tabPos:'Position Flow',tabAnalysis:'Analysis',
     breaking:'🚨 Breaking',scheduled:'⏰ Morning Brief',
     insider:'📋 Insider Trade',congress:'🏛️ Congress',
     buy:'Buy',sell:'Sell',
@@ -178,6 +207,7 @@ function applyLang(){
   document.getElementById('langToggle').textContent=L.langBtn;
   document.getElementById('tabNewsLabel').textContent=L.tabNews;
   document.getElementById('tabPosLabel').textContent=L.tabPos;
+  document.getElementById('tabAnalysisLabel').textContent=L.tabAnalysis;
   document.title=L.brand;
   updateNextBriefTime();
 }
@@ -193,14 +223,18 @@ function switchTab(tab){
   activeTab=tab;
   document.getElementById('tabNews').classList.toggle('active',tab==='news');
   document.getElementById('tabPos').classList.toggle('active',tab==='positions');
+  document.getElementById('tabAnalysis').classList.toggle('active',tab==='analysis');
   document.getElementById('alertList').classList.toggle('hidden',tab!=='news');
   document.getElementById('positionList').classList.toggle('hidden',tab!=='positions');
+  document.getElementById('analysisPanel').classList.toggle('hidden',tab!=='analysis');
   if(tab==='positions'&&lastPosSnap===null)loadPositions();
+  if(tab==='analysis')loadAnalysis();
 }
 
 function refreshCurrent(){
   if(activeTab==='news')loadAlerts();
-  else loadPositions();
+  else if(activeTab==='positions')loadPositions();
+  else{lastAnalysisTime=0;loadAnalysis();}
 }
 
 function updateNextBriefTime(){
@@ -300,6 +334,236 @@ function renderPositions(snap){
       ${detail}
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════
+//  MARKET ANALYSIS ENGINE
+// ══════════════════════════════════════════════
+let lastAnalysisTime=0,lastAnalysisHTML='';
+
+const PROXIES=[
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`
+];
+
+async function fetchFB(url,ms=9000){
+  const timeout=()=>new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms));
+  // direct
+  try{const r=await Promise.race([fetch(url,{cache:'no-store'}),timeout()]);if(r&&r.ok)return r;}catch(e){}
+  // proxies
+  for(const p of PROXIES){
+    try{const r=await Promise.race([fetch(p(url),{cache:'no-store'}),timeout()]);if(r&&r.ok)return r;}catch(e){}
+  }
+  throw new Error('network');
+}
+
+async function fetchQuotes(){
+  const syms=['^GSPC','ES=F','^VIX','^TNX','DX-Y.NYB','GC=F','CL=F'];
+  const url=`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${syms.map(encodeURIComponent).join('%2C')}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketPreviousClose,preMarketPrice,preMarketChange,preMarketChangePercent`;
+  const r=await fetchFB(url);
+  const json=await r.json();
+  const out={};
+  for(const q of json.quoteResponse?.result||[])out[q.symbol]=q;
+  return out;
+}
+
+async function fetchDIXGEX(){
+  const url='https://squeezemetrics.com/monitor/static/DIX.csv';
+  const r=await fetchFB(url,12000);
+  const text=await r.text();
+  const lines=text.trim().split('\n').filter(l=>l.trim()&&!l.toLowerCase().startsWith('date'));
+  return lines.slice(-5).map(l=>{
+    const p=l.split(',');
+    return{date:p[0]?.trim(),dix:parseFloat(p[1]),gex:parseFloat(p[2])};
+  }).filter(d=>!isNaN(d.dix));
+}
+
+async function fetchPCRatio(){
+  // Calculate from SPY options chain
+  const url='https://query1.finance.yahoo.com/v7/finance/options/SPY';
+  try{
+    const r=await fetchFB(url,8000);
+    const json=await r.json();
+    const opt=json.optionChain?.result?.[0]?.options?.[0];
+    if(!opt)return null;
+    const pv=(opt.puts||[]).reduce((s,o)=>s+(o.volume||0),0);
+    const cv=(opt.calls||[]).reduce((s,o)=>s+(o.volume||0),0);
+    if(!cv)return null;
+    return{ratio:+(pv/cv).toFixed(2),puts:pv,calls:cv,source:'SPY期权计算'};
+  }catch(e){return null;}
+}
+
+function gexStr(g){
+  if(!g||isNaN(g))return'—';
+  const s=g>=0?'+':'-',a=Math.abs(g);
+  return s+(a>=1e9?(a/1e9).toFixed(1)+'B':a>=1e6?(a/1e6).toFixed(0)+'M':a.toFixed(0));
+}
+function fmtPct(n,dec=2){return n!=null&&!isNaN(n)?(n>=0?'+':'')+n.toFixed(dec)+'%':'—';}
+function fmtP(n){return n!=null&&!isNaN(n)?Math.round(n).toLocaleString():'—';}
+function fmtN(n,d=2){return n!=null&&!isNaN(n)?n.toFixed(d):'—';}
+
+function mkCard(label,val,sub,cls){
+  return`<div class="data-card ${cls||''}"><div class="data-card-label">${label}</div><div class="data-card-value">${val}</div>${sub?`<div class="data-card-sub">${sub}</div>`:''}</div>`;
+}
+
+function buildSignals(dix,gex,pcRatio,futChgPct){
+  let score=0;const sigs=[];
+  if(dix!=null&&!isNaN(dix)){
+    if(dix>45){score++;sigs.push({t:'bull',l:'DIX暗池买入 '+dix.toFixed(1)+'%'});}
+    else if(dix<40){score--;sigs.push({t:'bear',l:'DIX暗池减少 '+dix.toFixed(1)+'%'});}
+    else sigs.push({t:'neutral',l:'DIX中性 '+dix.toFixed(1)+'%'});
+  }
+  if(gex!=null&&!isNaN(gex)){
+    if(gex>5e8){sigs.push({t:'bull',l:'正Gamma 市场稳定 '+gexStr(gex)});}
+    else if(gex<-5e8){score--;sigs.push({t:'bear',l:'负Gamma 波动放大 '+gexStr(gex)});}
+    else sigs.push({t:'neutral',l:'Gamma 中性 '+gexStr(gex)});
+  }
+  if(pcRatio!=null){
+    if(pcRatio>1.05){score++;sigs.push({t:'bull',l:'P/C偏高(恐慌保护) '+pcRatio});}
+    else if(pcRatio<0.70){score--;sigs.push({t:'bear',l:'P/C偏低(过度乐观) '+pcRatio});}
+    else sigs.push({t:'neutral',l:'P/C正常 '+pcRatio});
+  }
+  if(futChgPct!=null&&!isNaN(futChgPct)){
+    if(futChgPct>0.4){score++;sigs.push({t:'bull',l:'期货盘前上涨 '+fmtPct(futChgPct)});}
+    else if(futChgPct<-0.4){score--;sigs.push({t:'bear',l:'期货盘前下跌 '+fmtPct(futChgPct)});}
+    else sigs.push({t:'neutral',l:'期货小幅波动 '+fmtPct(futChgPct)});
+  }
+  return{score,sigs};
+}
+
+function calcPred(spxClose,vix,futPrice,futPrevClose,score,gex){
+  if(!spxClose||!vix||!futPrice)return null;
+  const dailySigma=spxClose*vix/100/Math.sqrt(252);
+  const futDelta=(futPrice-(futPrevClose||futPrice));
+  const estOpen=Math.round(spxClose+futDelta*0.95);
+  const gexMult=gex>2e9?0.65:gex<-1e9?1.45:1.0;
+  const range=dailySigma*1.6*gexMult;
+  const bias=Math.max(-1,Math.min(1,score/3));
+  const estHigh=Math.round(estOpen+range*(0.55+Math.max(0,bias)*0.3));
+  const estLow=Math.round(estOpen-range*(0.55+Math.max(0,-bias)*0.3));
+  const estClose=Math.round(estOpen+range*bias*0.45);
+  const expMove=Math.round(range);
+  const expMovePct=(range/spxClose*100).toFixed(2);
+  return{estOpen,estHigh,estLow,estClose,expMove,expMovePct};
+}
+
+function renderAnalysisHTML(quotes,dixArr,pcData){
+  const spx=quotes['^GSPC'],es=quotes['ES=F'],vix=quotes['^VIX'];
+  const tny=quotes['^TNX'],dxy=quotes['DX-Y.NYB'];
+  const gold=quotes['GC=F'],oil=quotes['CL=F'];
+
+  const spxClose=spx?.regularMarketPreviousClose||spx?.regularMarketPrice;
+  const futPrice=es?.regularMarketPrice;
+  const futClose=es?.regularMarketPreviousClose;
+  const futChgPct=es?.regularMarketChangePercent;
+  const vixLevel=vix?.regularMarketPrice;
+  const latest=dixArr[dixArr.length-1];
+
+  const{score,sigs}=buildSignals(latest?.dix,latest?.gex,pcData?.ratio,futChgPct);
+  const scoreTag=score>1?['看涨','bull']:score<-1?['看跌','bear']:['中性','neutral'];
+  const pred=calcPred(spxClose,vixLevel,futPrice,futClose,score,latest?.gex);
+
+  let h='';
+
+  // ── 盘前数据 ──
+  h+=`<div class="asec"><div class="asec-title">🌅 盘前核心数据 <span style="font-size:.72rem;color:var(--text-light);font-weight:400">Yahoo Finance 实时</span></div><div class="analysis-grid">`;
+  const esPre=es?.preMarketPrice;
+  const esPct=es?.preMarketChangePercent;
+  h+=mkCard('ES 期货',esPre?fmtP(esPre):fmtP(futPrice),esPre?fmtPct(esPct)+' 盘前':fmtPct(futChgPct),(esPct??futChgPct)>=0?'up':'down');
+  h+=mkCard('SPX 昨收',fmtP(spxClose),spx?fmtPct(spx.regularMarketChangePercent)+' 昨日':'','');
+  h+=mkCard('VIX 恐慌指数',fmtN(vixLevel,1),vixLevel>25?'⚠️ 高波动':vixLevel>18?'中性':'😌 低波动',vixLevel>20?'down':vixLevel<15?'up':'');
+  h+=mkCard('10Y 美债',fmtN(tny?.regularMarketPrice,3)+'%',fmtPct(tny?.regularMarketChangePercent),tny?.regularMarketChangePercent>=0?'down':'up');
+  h+=mkCard('美元指数 DXY',fmtN(dxy?.regularMarketPrice,2),fmtPct(dxy?.regularMarketChangePercent),'');
+  h+=mkCard('黄金 Gold','$'+fmtP(gold?.regularMarketPrice),fmtPct(gold?.regularMarketChangePercent),gold?.regularMarketChangePercent>=0?'up':'down');
+  h+=mkCard('原油 WTI','$'+fmtN(oil?.regularMarketPrice,1),fmtPct(oil?.regularMarketChangePercent),oil?.regularMarketChangePercent>=0?'up':'down');
+  h+=`</div></div>`;
+
+  // ── DIX / GEX ──
+  h+=`<div class="asec"><div class="asec-title">🌑 暗池 · Gamma 数据 <span style="font-size:.72rem;color:var(--text-light);font-weight:400">SqueezeMetrics</span></div>`;
+  if(dixArr.length){
+    h+=`<div class="analysis-grid">`;
+    h+=mkCard('DIX 暗池指数',fmtN(latest?.dix,1)+'%',latest?.date||'',latest?.dix>45?'up':latest?.dix<40?'down':'');
+    h+=mkCard('GEX Gamma暴露',gexStr(latest?.gex),latest?.gex>0?'正Gamma 稳定':'负Gamma 放大',latest?.gex>0?'up':'down');
+    h+=`</div>`;
+    if(dixArr.length>1){
+      h+=`<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px">近期趋势：`;
+      h+=dixArr.map(d=>`<span style="margin-right:10px">${d.date?.slice(5)||''} DIX ${fmtN(d.dix,1)}% / GEX ${gexStr(d.gex)}</span>`).join('');
+      h+=`</div>`;
+    }
+    h+=`<div class="anote">📌 <strong>DIX > 45%</strong> = 暗池大量买入（机构看涨信号）；<strong>DIX < 40%</strong> = 机构撤退，谨慎。<br>📌 <strong>正GEX</strong> = 做市商多Gamma，市场会自动回归，波动被压制；<strong>负GEX</strong> = 做市商空Gamma，行情被放大，可能出现大单边行情。</div>`;
+  }else{
+    h+=`<div class="adata-err">⚠️ DIX/GEX 获取失败 → <a href="https://squeezemetrics.com/monitor" target="_blank" style="color:var(--primary)">手动查看</a></div>`;
+  }
+  h+=`</div>`;
+
+  // ── 期权分析 ──
+  h+=`<div class="asec"><div class="asec-title">⚙️ 期权 Put/Call 分析</div>`;
+  if(pcData){
+    h+=`<div class="analysis-grid">`;
+    h+=mkCard('Put/Call 比率',fmtN(pcData.ratio,2),pcData.source,pcData.ratio>1?'up':pcData.ratio<0.7?'down':'');
+    h+=mkCard('Put 成交量',pcData.puts?.toLocaleString()||'—','','');
+    h+=mkCard('Call 成交量',pcData.calls?.toLocaleString()||'—','','');
+    h+=`</div>`;
+    h+=`<div class="anote">📌 <strong>P/C > 1.05</strong> = 市场大量买保护（恐慌）→ 反向信号往往看涨；<strong>P/C < 0.70</strong> = 市场过度乐观 → 潜在下跌风险。当前：${pcData.ratio>1.05?'📈 Put偏多，反向偏多':pcData.ratio<0.70?'📉 Call偏多，注意风险':'⚖️ 正常区间'}。</div>`;
+  }else{
+    h+=`<div class="signal-row"><div class="signal-label">P/C 数据</div><div><span class="adata-err">获取失败</span> <a href="https://www.cboe.com/us/options/market_statistics/daily/" target="_blank" style="font-size:.78rem;color:var(--primary)">CBOE 手动查看</a></div></div>`;
+  }
+  h+=`</div>`;
+
+  // ── 综合信号 ──
+  h+=`<div class="asec"><div class="asec-title">🔍 综合信号分析</div>`;
+  for(const s of sigs){
+    h+=`<div class="signal-row"><div class="signal-label">${s.l}</div><div><span class="sbadge ${s.t}">${s.t==='bull'?'📈 看涨':s.t==='bear'?'📉 看跌':'⚖️ 中性'}</span></div></div>`;
+  }
+  h+=`</div>`;
+
+  // ── 预测 ──
+  h+=`<div class="asec"><div class="asec-title">🎯 今日 SPX 预测 <span class="sbadge ${scoreTag[1]}" style="margin-left:8px">${scoreTag[0]}</span></div>`;
+  if(pred){
+    const vPct=Math.min(100,parseFloat(pred.expMovePct)/3*100);
+    const vCol=vPct>66?'#ef4444':vPct>33?'#f59e0b':'#10b981';
+    h+=`<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="color:var(--text-muted)">预计日内波幅</span><span style="font-weight:700;color:${vCol}">±${pred.expMove}点 (${pred.expMovePct}%)</span></div>`;
+    h+=`<div class="vol-meter"><div class="vol-fill" style="width:${vPct}%;background:${vCol}"></div></div>`;
+    h+=`<div class="pred-grid">
+      <div class="pred-box pbox-o"><div class="pred-box-label">🔔 预计开盘</div><div class="pred-box-value">${fmtP(pred.estOpen)}</div></div>
+      <div class="pred-box pbox-h"><div class="pred-box-label">🟢 预计最高</div><div class="pred-box-value">${fmtP(pred.estHigh)}</div></div>
+      <div class="pred-box pbox-l"><div class="pred-box-label">🔴 预计最低</div><div class="pred-box-value">${fmtP(pred.estLow)}</div></div>
+      <div class="pred-box pbox-c"><div class="pred-box-label">🏁 预计收盘</div><div class="pred-box-value">${fmtP(pred.estClose)}</div></div>
+    </div>`;
+    const big=parseFloat(pred.expMovePct)>1.5;
+    const negG=latest?.gex<-5e8;
+    h+=`<div class="anote" style="margin-top:12px">
+      ${big||negG?'⚠️ <strong>今日波动预警：</strong>':'✅ <strong>今日波动预计正常：</strong>'}
+      ${big?'VIX偏高意味着市场预期较大波动。':''}${negG?'负Gamma环境下行情容易被放大。':''}
+      <br><br>📐 <strong>预测方法：</strong>开盘 = SPX昨收 + ES期货溢价；日内区间 = VIX隐含波动率 × GEX修正系数；方向偏向由 DIX + P/C + 期货方向综合评分(${score>0?'+':''}${score}分)决定。
+      <br><span style="color:var(--danger)">⚠️ 仅供参考，不构成投资建议。实际走势可能与预测偏差较大。</span>
+    </div>`;
+  }else{
+    h+=`<div class="adata-err" style="padding:16px 0;text-align:center">市场数据不足，无法生成预测。请检查网络或等待盘前开始后刷新。</div>`;
+  }
+  h+=`</div>`;
+
+  h+=`<div style="text-align:center;font-size:.72rem;color:var(--text-light);padding:8px 0">数据更新: ${new Date().toLocaleTimeString('zh-CN')} · 盘前数据，每次点刷新获取最新</div>`;
+  return h;
+}
+
+async function loadAnalysis(){
+  const now=Date.now();
+  if(lastAnalysisHTML&&now-lastAnalysisTime<4*60*1000){
+    document.getElementById('analysisInner').innerHTML=lastAnalysisHTML;return;
+  }
+  document.getElementById('analysisInner').innerHTML=`<div class="loading">📡 正在获取实时市场数据…</div>`;
+  const[qr,dr,pr]=await Promise.allSettled([fetchQuotes(),fetchDIXGEX(),fetchPCRatio()]);
+  const quotes=qr.status==='fulfilled'?qr.value:{};
+  const dix=dr.status==='fulfilled'?dr.value:[];
+  const pc=pr.status==='fulfilled'?pr.value:null;
+  if(!Object.keys(quotes).length&&!dix.length){
+    document.getElementById('analysisInner').innerHTML=`<div class="stocks-empty"><div class="empty-icon">🌐</div><div>数据获取失败，请检查网络连接后刷新</div></div>`;
+    return;
+  }
+  lastAnalysisHTML=renderAnalysisHTML(quotes,dix,pc);
+  lastAnalysisTime=now;
+  document.getElementById('analysisInner').innerHTML=lastAnalysisHTML;
 }
 
 function doLogout(){sessionStorage.removeItem('portal_auth');window.location.href='index.html';}
