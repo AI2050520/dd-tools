@@ -120,6 +120,7 @@
     .dpred-value{font-size:1rem;font-weight:800;color:#fff}
     .dp-o{background:linear-gradient(135deg,#4f46e5,#7c3aed)}.dp-h{background:linear-gradient(135deg,#059669,#0d9488)}
     .dp-l{background:linear-gradient(135deg,#dc2626,#9f1239)}.dp-c{background:linear-gradient(135deg,#d97706,#b45309)}
+    .dpred-prev{font-size:.6rem;color:rgba(255,255,255,.65);margin-top:3px}
     .daily-analysis{font-size:.83rem;color:var(--text-muted);line-height:1.75;background:var(--bg);border-radius:8px;padding:12px 14px}
     .daily-headline{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.4}
     .daily-actual{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}
@@ -447,19 +448,10 @@ function renderDaily(snap){
     return;
   }
 
-  // build one metric row: name | current value | (昨 prev, delta) | interpretation
-  function mrow(name,curStr,valCls,prevStr,deltaStr,deltaCls,interp){
-    const cmpHtml=prevStr
-      ?`<span class="dmetric-cmp">（昨 ${prevStr}${deltaStr?` <span class="${deltaCls}">${deltaStr}</span>`:''  }）</span>`
-      :'';
-    const interpHtml=interp?`<span class="dmetric-interp">${interp}</span>`:'';
-    return `<div class="dmetric-row"><span class="dmetric-name">${name}</span><span class="dmetric-val ${valCls}">${curStr}</span>${cmpHtml}${interpHtml}</div>`;
-  }
-
-  // 返回同一文档按LA时间的日期字符串（用于跨日比较）
+  // 返回按LA时区的日期key（用于判断是否同一天）
   function dayKey(ts){
-    const d=new Date((ts?.toDate?ts.toDate():new Date(ts||0)).toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const date=ts?.toDate?ts.toDate():new Date(ts||0);
+    return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
   }
   // 格式化分析文字：每个编号项目前加换行
   function fmtAnalysis(text){
@@ -478,25 +470,41 @@ function renderDaily(snap){
       const pd=snap.docs[i].data();
       if(dayKey(pd.timestamp)!==curKey){p=pd;break;}
     }
+
+    // 括号标签：显示前一日的实际日期（如"5/14"），而不是"昨"
+    let prevLabel='';
+    if(p&&p.timestamp){
+      const pts=p.timestamp?.toDate?p.timestamp.toDate():new Date(p.timestamp||0);
+      prevLabel=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'numeric',day:'numeric'}).format(pts);
+    }
+
+    // 指标行：名称 | 当前值 | (日期 前日值 ±变化) | 解读
+    function mrow(name,curStr,valCls,prevStr,deltaStr,deltaCls,interp){
+      const cmpHtml=prevStr&&prevLabel
+        ?`<span class="dmetric-cmp">（${prevLabel} ${prevStr}${deltaStr?` <span class="${deltaCls}">${deltaStr}</span>`:''}）</span>`
+        :'';
+      const interpHtml=interp?`<span class="dmetric-interp">${interp}</span>`:'';
+      return `<div class="dmetric-row"><span class="dmetric-name">${name}</span><span class="dmetric-val ${valCls}">${curStr}</span>${cmpHtml}${interpHtml}</div>`;
+    }
     const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp||Date.now());
-    const dateStr=ts.toLocaleString(lang==='zh'?'zh-CN':'en-US',{year:'numeric',month:'short',day:'numeric',weekday:'short',timeZone:'America/Los_Angeles'})+' LA';
+    const dateStr=ts.toLocaleString(lang==='zh'?'zh-CN':'en-US',{year:'numeric',month:'short',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit',timeZone:'America/Los_Angeles'})+' LA';
     const sig=d.signal||'neutral';
     const sigLabel=sig==='bull'?'📈 看涨':sig==='bear'?'📉 看跌':'⚖️ 中性';
 
     // ── SPX Close ─────────────────────────────────
-    const spxC=d.spxClose!=null?Math.round(d.spxClose):null;
-    const spxP=p?.spxClose!=null?Math.round(p.spxClose):null;
+    const spxC=d.spxClose!=null?parseFloat(d.spxClose):null;
+    const spxP=p?.spxClose!=null?parseFloat(p.spxClose):null;
     let spxDelta='',spxDCls='',spxInterp='';
     if(spxC!=null&&spxP!=null){
       const diff=spxC-spxP,pct=(diff/spxP*100).toFixed(2);
-      spxDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toLocaleString()+' ('+pct+'%)';
+      spxDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(2)+' ('+pct+'%)';
       spxDCls=diff>=0?'pos':'neg';
       if(diff>50)spxInterp='强劲反弹，多头动能充足';
       else if(diff>0)spxInterp='小幅上涨，市场偏多';
       else if(diff>-50)spxInterp='小幅下跌，偏空但跌幅有限';
       else spxInterp='大幅下跌，空头占主导';
     }
-    const spxRow=mrow('SPX 昨收',spxC!=null?spxC.toLocaleString():'—','',spxP!=null?spxP.toLocaleString():null,spxDelta,spxDCls,spxInterp);
+    const spxRow=mrow('SPX',spxC!=null?spxC.toFixed(2):'—','',spxP!=null?spxP.toFixed(2):null,spxDelta,spxDCls,spxInterp);
 
     // ── VIX ───────────────────────────────────────
     const vixC=d.vix!=null?parseFloat(d.vix):null;
@@ -572,8 +580,8 @@ function renderDaily(snap){
     const gexRow=mrow('GEX 期权',gexC!=null?gexStr(gexC):'—',gexCls,gexP!=null?gexStr(gexP):null,gexDelta,gexDCls,gexInterp);
 
     // ── P/C Ratio ─────────────────────────────────
-    const pcC=d.pcRatio!=null?parseFloat(d.pcRatio):null;
-    const pcP=p?.pcRatio!=null?parseFloat(p.pcRatio):null;
+    const pcC=(d.pcRatio!=null&&d.pcRatio>0)?parseFloat(d.pcRatio):null;
+    const pcP=(p?.pcRatio!=null&&p?.pcRatio>0)?parseFloat(p.pcRatio):null;
     let pcDelta='',pcDCls='',pcInterp='';
     if(pcC!=null&&pcP!=null){
       const diff=pcC-pcP;
@@ -590,12 +598,14 @@ function renderDaily(snap){
     const pcRow=mrow('P/C 比',pcC!=null?pcC.toFixed(2):'—',pcCls,pcP!=null?pcP.toFixed(2):null,pcDelta,pcDCls,pcInterp);
 
     // ── ES Futures ────────────────────────────────
+    // 当前：实时点位 + 涨跌%；括号：上一交易日结算价
     const esC=d.futuresChg!=null?parseFloat(d.futuresChg):null;
-    const esP=p?.futuresChg!=null?parseFloat(p.futuresChg):null;
+    const esPrice=d.esPrice!=null&&d.esPrice>0?Math.round(parseFloat(d.esPrice)):null;
+    const esPriceP=p?.esPrice!=null&&p?.esPrice>0?Math.round(parseFloat(p.esPrice)):null;
     let esDelta='',esDCls='',esInterp='';
-    if(esC!=null&&esP!=null){
-      const diff=esC-esP;
-      esDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toFixed(2)+'%';
+    if(esPrice!=null&&esPriceP!=null){
+      const diff=esPrice-esPriceP;
+      esDelta=(diff>=0?'↑+':'↓')+Math.abs(diff).toLocaleString()+'pt';
       esDCls=diff>=0?'pos':'neg';
     }
     if(esC!=null){
@@ -606,8 +616,12 @@ function renderDaily(snap){
       else esInterp='期货大幅低开，预计弱势开盘，空头主导';
     }
     const esCls=esC!=null?(esC>=0?'up':'down'):'';
-    const esStr=esC!=null?(esC>=0?'+':'')+esC.toFixed(2)+'%':'—';
-    const esPStr=esP!=null?(esP>=0?'+':'')+esP.toFixed(2)+'%':null;
+    // 主值：显示实时点位 + 涨跌%
+    const esStr=esPrice!=null
+      ?esPrice.toLocaleString()+(esC!=null?` (${esC>=0?'+':''}${esC.toFixed(2)}%)`:'')
+      :(esC!=null?(esC>=0?'+':'')+esC.toFixed(2)+'%':'—');
+    // 括号：显示上一日结算价格（点位）
+    const esPStr=esPriceP!=null?esPriceP.toLocaleString():null;
     const esRow=mrow('ES 期货',esStr,esCls,esPStr,esDelta,esDCls,esInterp);
 
     // ── 10Y Yield ─────────────────────────────────
@@ -673,14 +687,42 @@ function renderDaily(snap){
 
     const metricsHtml=`<div class="daily-metrics-list">${spxRow}${vixRow}${dixRow}${gexRow}${pcRow}${esRow}${yldRow}${fgRow}${peRow}</div>`;
 
-    // 预测 OHLC
+    // 预测 / 实际 OHLC
     let predHtml='';
-    if(d.predOpen||d.predHigh||d.predLow||d.predClose){
+    if(d.predOpen||d.predHigh||d.predLow||d.predClose||d.todayOpen){
+      // Derive market-open status from analysis timestamp (reliable, doesn't depend on stored field)
+      const _laParts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',weekday:'short',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(ts);
+      const _laH=_laParts.find(x=>x.type==='hour')?.value|0;
+      const _laM=_laParts.find(x=>x.type==='minute')?.value|0;
+      const _laWd=_laParts.find(x=>x.type==='weekday')?.value||'';
+      const _wasOpen=_laWd!=='Sat'&&_laWd!=='Sun'&&(_laH>9||(_laH===9&&_laM>=30))&&_laH<16;
+      // Only treat as "open" if we actually have a real intraday open price (>0)
+      const isOpenRec=(_wasOpen||d.marketOpen===true||d.marketOpen==='true')&&d.todayOpen>0;
+      const pL = prevLabel||'昨';
+      // prev-day comparison values shown under each box
+      const pvO = isOpenRec ? (d.prevDayOpen>0  ? parseFloat(d.prevDayOpen).toFixed(2)  : null)
+                            : (d.todayOpen>0    ? parseFloat(d.todayOpen).toFixed(2)    : null);
+      const pvH = isOpenRec ? (d.prevDayHigh>0  ? parseFloat(d.prevDayHigh).toFixed(2)  : null)
+                            : (d.todayHigh>0    ? parseFloat(d.todayHigh).toFixed(2)    : null);
+      const pvL = isOpenRec ? (d.prevDayLow>0   ? parseFloat(d.prevDayLow).toFixed(2)   : null)
+                            : (d.todayLow>0     ? parseFloat(d.todayLow).toFixed(2)     : null);
+      const pvC = isOpenRec ? (d.prevDayClose>0 ? parseFloat(d.prevDayClose).toFixed(2) : null)
+                            : (d.todayClose>0   ? parseFloat(d.todayClose).toFixed(2)   : null);
+      // main display values — actual if available, otherwise always fall back to prediction
+      const vO = isOpenRec&&d.todayOpen>0 ? parseFloat(d.todayOpen).toFixed(2)  : (d.predOpen  ? parseFloat(d.predOpen).toFixed(2)  : '—');
+      const vH = isOpenRec&&d.todayHigh>0 ? parseFloat(d.todayHigh).toFixed(2)  : (d.predHigh  ? parseFloat(d.predHigh).toFixed(2)  : '—');
+      const vL = isOpenRec&&d.todayLow>0  ? parseFloat(d.todayLow).toFixed(2)   : (d.predLow   ? parseFloat(d.predLow).toFixed(2)   : '—');
+      const vC = d.predClose ? parseFloat(d.predClose).toFixed(2) : '—';
+      const lO = isOpenRec ? '🔔 实际开盘' : '🔔 预计开盘';
+      const lH = isOpenRec ? '🟢 日内最高' : '🟢 预计最高';
+      const lL = isOpenRec ? '🔴 日内最低' : '🔴 预计最低';
+      const lC = isOpenRec ? '🏁 预测收盘' : '🏁 预计收盘';
+      const prev = v => v ? `<div class="dpred-prev">(${pL} ${v})</div>` : '';
       predHtml=`<div class="daily-pred">
-        <div class="dpred dp-o"><div class="dpred-label">🔔 预计开盘</div><div class="dpred-value">${d.predOpen?Math.round(d.predOpen).toLocaleString():'—'}</div></div>
-        <div class="dpred dp-h"><div class="dpred-label">🟢 预计最高</div><div class="dpred-value">${d.predHigh?Math.round(d.predHigh).toLocaleString():'—'}</div></div>
-        <div class="dpred dp-l"><div class="dpred-label">🔴 预计最低</div><div class="dpred-value">${d.predLow?Math.round(d.predLow).toLocaleString():'—'}</div></div>
-        <div class="dpred dp-c"><div class="dpred-label">🏁 预计收盘</div><div class="dpred-value">${d.predClose?Math.round(d.predClose).toLocaleString():'—'}</div></div>
+        <div class="dpred dp-o"><div class="dpred-label">${lO}</div><div class="dpred-value">${vO}</div>${prev(pvO)}</div>
+        <div class="dpred dp-h"><div class="dpred-label">${lH}</div><div class="dpred-value">${vH}</div>${prev(pvH)}</div>
+        <div class="dpred dp-l"><div class="dpred-label">${lL}</div><div class="dpred-value">${vL}</div>${prev(pvL)}</div>
+        <div class="dpred dp-c"><div class="dpred-label">${lC}</div><div class="dpred-value">${vC}</div>${prev(pvC)}</div>
       </div>`;
     }
 
