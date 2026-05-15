@@ -456,9 +456,28 @@ function renderDaily(snap){
     return `<div class="dmetric-row"><span class="dmetric-name">${name}</span><span class="dmetric-val ${valCls}">${curStr}</span>${cmpHtml}${interpHtml}</div>`;
   }
 
+  // 返回同一文档按LA时间的日期字符串（用于跨日比较）
+  function dayKey(ts){
+    const d=new Date((ts?.toDate?ts.toDate():new Date(ts||0)).toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+  // 格式化分析文字：每个编号项目前加换行
+  function fmtAnalysis(text){
+    if(!text)return'';
+    return text
+      .replace(/([①②③④⑤⑥⑦⑧⑨])/g,'<br><br>$1')
+      .replace(/^(<br>)+/,'');
+  }
+
   listEl.innerHTML=snap.docs.map((doc,idx)=>{
     const d=doc.data();
-    const p=snap.docs[idx+1]?.data(); // previous entry (docs are desc-sorted, so idx+1 is older)
+    // 找上一个 *不同日历日* 的文档（跳过同天多次分析）
+    const curKey=dayKey(d.timestamp);
+    let p=null;
+    for(let i=idx+1;i<snap.docs.length;i++){
+      const pd=snap.docs[i].data();
+      if(dayKey(pd.timestamp)!==curKey){p=pd;break;}
+    }
     const ts=d.timestamp?.toDate?d.timestamp.toDate():new Date(d.timestamp||Date.now());
     const dateStr=ts.toLocaleString(lang==='zh'?'zh-CN':'en-US',{year:'numeric',month:'short',day:'numeric',weekday:'short',timeZone:'America/Los_Angeles'})+' LA';
     const sig=d.signal||'neutral';
@@ -685,7 +704,7 @@ function renderDaily(snap){
       ${d.headline?`<div class="daily-headline">${d.headline}</div>`:''}
       ${metricsHtml}
       ${predHtml}
-      ${d.analysis?`<div class="daily-analysis">${d.analysis}${actualHtml}</div>`:actualHtml}
+      ${d.analysis?`<div class="daily-analysis">${fmtAnalysis(d.analysis)}${actualHtml}</div>`:actualHtml}
     </div>`;
   }).join('');
 }
