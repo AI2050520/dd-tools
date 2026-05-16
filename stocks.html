@@ -479,9 +479,10 @@ function renderDaily(snap){
     }
 
     // 指标行：名称 | 当前值 | (日期 前日值 ±变化) | 解读
-    function mrow(name,curStr,valCls,prevStr,deltaStr,deltaCls,interp){
-      const cmpHtml=prevStr&&prevLabel
-        ?`<span class="dmetric-cmp">（${prevLabel} ${prevStr}${deltaStr?` <span class="${deltaCls}">${deltaStr}</span>`:''}）</span>`
+    function mrow(name,curStr,valCls,prevStr,deltaStr,deltaCls,interp,labelOverride){
+      const lbl=labelOverride!==undefined?labelOverride:prevLabel;
+      const cmpHtml=prevStr&&lbl
+        ?`<span class="dmetric-cmp">（${lbl} ${prevStr}${deltaStr?` <span class="${deltaCls}">${deltaStr}</span>`:''}）</span>`
         :'';
       const interpHtml=interp?`<span class="dmetric-interp">${interp}</span>`:'';
       return `<div class="dmetric-row"><span class="dmetric-name">${name}</span><span class="dmetric-val ${valCls}">${curStr}</span>${cmpHtml}${interpHtml}</div>`;
@@ -530,7 +531,7 @@ function renderDaily(snap){
 
     // ── DIX ───────────────────────────────────────
     const dixC=d.dix!=null?parseFloat(d.dix):null;
-    const dixP=p?.dix!=null?parseFloat(p.dix):null;
+    const dixP=d.prevDix!=null&&d.prevDix!==0?parseFloat(d.prevDix):(p?.dix!=null?parseFloat(p.dix):null);
     let dixDelta='',dixDCls='',dixInterp='';
     if(dixC!=null&&dixP!=null){
       const diff=dixC-dixP;
@@ -549,11 +550,12 @@ function renderDaily(snap){
       }
     }
     const dixCls=dixC!=null?(dixC>45?'up':dixC<40?'down':''):'';
-    const dixRow=mrow('DIX 暗池',dixC!=null?dixC.toFixed(1)+'%':'—',dixCls,dixP!=null?dixP.toFixed(1)+'%':null,dixDelta,dixDCls,dixInterp);
+    const dixPLabel=d.prevDixLabel||prevLabel;
+    const dixRow=mrow('DIX 暗池',dixC!=null?dixC.toFixed(1)+'%':'—',dixCls,dixP!=null?dixP.toFixed(1)+'%':null,dixDelta,dixDCls,dixInterp,dixPLabel);
 
     // ── GEX ───────────────────────────────────────
     const gexC=d.gex!=null?parseFloat(d.gex):null;
-    const gexP=p?.gex!=null?parseFloat(p.gex):null;
+    const gexP=d.prevGex!=null&&d.prevGex!==0?parseFloat(d.prevGex):(p?.gex!=null?parseFloat(p.gex):null);
     let gexDelta='',gexDCls='',gexInterp='';
     if(gexC!=null&&gexP!=null){
       const diff=gexC-gexP,ab=Math.abs(diff);
@@ -577,7 +579,7 @@ function renderDaily(snap){
       gexInterp=gexC>0?'正Gamma，做市商承托市场，越跌越买，抑制下行波动':'负Gamma，做市商放大波动，市场方向性强但波动风险大';
     }
     const gexCls=gexC!=null?(gexC>0?'up':'down'):'';
-    const gexRow=mrow('GEX 期权',gexC!=null?gexStr(gexC):'—',gexCls,gexP!=null?gexStr(gexP):null,gexDelta,gexDCls,gexInterp);
+    const gexRow=mrow('GEX 期权',gexC!=null?gexStr(gexC):'—',gexCls,gexP!=null?gexStr(gexP):null,gexDelta,gexDCls,gexInterp,dixPLabel);
 
     // ── P/C Ratio ─────────────────────────────────
     const pcC=(d.pcRatio!=null&&d.pcRatio>0)?parseFloat(d.pcRatio):null;
