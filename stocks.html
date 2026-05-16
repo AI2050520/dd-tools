@@ -695,7 +695,7 @@ function renderDaily(snap){
       const _laH=_laParts.find(x=>x.type==='hour')?.value|0;
       const _laM=_laParts.find(x=>x.type==='minute')?.value|0;
       const _laWd=_laParts.find(x=>x.type==='weekday')?.value||'';
-      const _wasOpen=_laWd!=='Sat'&&_laWd!=='Sun'&&(_laH>9||(_laH===9&&_laM>=30))&&_laH<16;
+      const _wasOpen=_laWd!=='Sat'&&_laWd!=='Sun'&&(_laH>6||(_laH===6&&_laM>=30))&&_laH<13;
       // Only treat as "open" if we actually have a real intraday open price (>0)
       const isOpenRec=(_wasOpen||d.marketOpen===true||d.marketOpen==='true')&&d.todayOpen>0;
       const pL = prevLabel||'昨';
